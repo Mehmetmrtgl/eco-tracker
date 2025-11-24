@@ -96,4 +96,65 @@ async findAll(userId: string) {
       }, 
     });
   }
+
+  // ... (findAll fonksiyonundan sonra) ...
+
+  // ANALİZ VERİSİ GETİRME
+  async getAnalysis(userId: string, startDate: Date, endDate: Date) {
+    
+    // 1. Gelir ve Gider Toplamları
+    const totals = await this.prisma.transactions.groupBy({
+      by: ['type'],
+      where: {
+        user_id: userId,
+        transaction_date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      _sum: { amount: true },
+    });
+
+    // 2. Kategori Bazlı Harcama Dağılımı (Sadece Giderler)
+    const expensesByCategory = await this.prisma.transactions.groupBy({
+      by: ['category_id'], // ID'ye göre grupla
+      where: {
+        user_id: userId,
+        type: 'EXPENSE',
+        transaction_date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      _sum: { amount: true },
+    });
+
+    // Kategori isimlerini bulmak için ID'leri kullan
+    // (Prisma groupBy ile include'u aynı anda desteklemez, bu yüzden manuel eşleştiriyoruz)
+    const categoryIds = expensesByCategory.map(e => e.category_id).filter(id => id !== null) as string[];
+    
+    const categories = await this.prisma.categories.findMany({
+      where: { id: { in: categoryIds } }
+    });
+
+    // Veriyi Frontend için hazırla: [{ name: 'Market', value: 500 }, ...]
+    const chartData = expensesByCategory.map(item => {
+      const cat = categories.find(c => c.id === item.category_id);
+      return {
+        name: cat ? cat.name : 'Diğer',
+        value: item._sum.amount?.toNumber() || 0
+      };
+    }).filter(item => item.value > 0);
+
+    // Toplamları düzenle
+    const totalIncome = totals.find(t => t.type === 'INCOME')?._sum.amount?.toNumber() || 0;
+    const totalExpense = totals.find(t => t.type === 'EXPENSE')?._sum.amount?.toNumber() || 0;
+
+    return {
+      totalIncome,
+      totalExpense,
+      netSavings: totalIncome - totalExpense,
+      expenseChart: chartData
+    };
+  }
 }
