@@ -7,7 +7,15 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   // Kullanıcı Ekleme
-  async create(data: Prisma.usersCreateInput) {
+async create(data: Prisma.usersCreateInput) {
+  const existingUser = await this.prisma.users.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      throw new Error('DUPLICATE_EMAIL');
+    }
+
     return this.prisma.users.create({
       data,
     });
@@ -23,5 +31,18 @@ export class UsersService {
     return this.prisma.users.findUnique({
       where: { id },
     });
+  }
+
+  async login(email: string, pass: string) {
+
+    const user = await this.prisma.users.findUnique({
+      where: { email },
+    });
+
+    if (!user || user.password_hash !== pass) {
+      return null;
+    }
+
+    return user;
   }
 }
