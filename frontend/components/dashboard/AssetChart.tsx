@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/formatters";
 interface ChartData {
   name: string;
   value: number;
+  [key: string]: any; // <-- BU SATIRI EKLE (Recharts için joker kart)
 }
 
 interface AssetChartProps {

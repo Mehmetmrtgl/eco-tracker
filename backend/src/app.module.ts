@@ -9,11 +9,12 @@ import { AuthModule } from './auth/auth.module';
 import { AssetsModule } from './assets/assets.module';
 import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
 import { DebtsModule } from './debts/debts.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
     PrismaModule, 
-    UsersModule, AuthModule, AssetsModule, ExchangeRateModule, DebtsModule,
+    UsersModule, AuthModule, AssetsModule, ExchangeRateModule, DebtsModule, TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService], 

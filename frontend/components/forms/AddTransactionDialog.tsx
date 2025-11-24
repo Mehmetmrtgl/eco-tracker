@@ -1,36 +1,96 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-export default function AddTransactionDialog() {
+export default function AddTransactionDialog({ onSuccess }: { onSuccess?: () => void }) {
   const [open, setOpen] = useState(false);
-  const [type, setType] = useState("expense"); // Varsayılan: Gider
+  const [loading, setLoading] = useState(false);
+  const today = new Date().toISOString().split('T')[0];
+
+  // Form Durumu
+  const [type, setType] = useState("EXPENSE"); // EXPENSE veya INCOME
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [selectedCardId, setSelectedCardId] = useState(""); 
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("");
+  const [desc, setDesc] = useState("");
+  const [date, setDate] = useState(today);
+
+  // Kullanıcının Kredi Kartlarını Tutacak State
+  const [creditCards, setCreditCards] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (open && paymentMethod === 'CREDIT_CARD') {
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        fetch(`http://localhost:4000/debts/${user.id}`)
+          .then(res => res.json())
+          .then(data => {
+            const cards = data.filter((d: any) => d.type === 'CREDIT_CARD' && !d.is_closed);
+            setCreditCards(cards);
+          });
+      }
+    }
+  }, [open, paymentMethod]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+      if (!storedUser) return;
+      const user = JSON.parse(storedUser);
+
+      // Eğer Gelir ise ve açıklama girilmediyse, kategori adını açıklama yapalım (Boş kalmasın)
+      let finalDesc = desc;
+      if (type === 'INCOME' && !finalDesc) {
+          finalDesc = category; 
+      }
+
+      const payload = {
+        amount: Number(amount),
+        type: type,
+        category: category,
+        description: finalDesc,
+        date: date,
+        paymentMethod: paymentMethod,
+        debtId: paymentMethod === 'CREDIT_CARD' ? selectedCardId : null,
+      };
+
+      const res = await fetch(`http://localhost:4000/transactions/${user.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setOpen(false);
+        setAmount(""); setDesc(""); setCategory("");
+        if (onSuccess) onSuccess();
+      } else {
+        alert("İşlem eklenirken hata oluştu.");
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 bg-blue-600">
-          <Plus size={18} />
-          İşlem Ekle
+        <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
+          <Plus size={18} /> İşlem Ekle
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
@@ -38,62 +98,98 @@ export default function AddTransactionDialog() {
           <DialogTitle>Yeni İşlem Ekle</DialogTitle>
         </DialogHeader>
 
-        {/* Gelir / Gider Geçişi */}
-        <Tabs defaultValue="expense" className="w-full" onValueChange={setType}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="expense">Gider (Harcama)</TabsTrigger>
-            <TabsTrigger value="income">Gelir (Kazanç)</TabsTrigger>
+        <Tabs defaultValue="EXPENSE" onValueChange={(val) => setType(val)} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="EXPENSE" className="data-[state=active]:bg-red-100 data-[state=active]:text-red-700">Gider (Harcama)</TabsTrigger>
+            <TabsTrigger value="INCOME" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-700">Gelir (Kazanç)</TabsTrigger>
           </TabsList>
 
-          {/* Form Alanı (Her iki durum için de ortak form kullanıyoruz şimdilik) */}
-          <form className="grid gap-4 py-4">
+          <form onSubmit={handleSubmit} className="grid gap-4">
             
             {/* Tutar */}
             <div className="grid gap-2">
-              <Label htmlFor="amount">Tutar</Label>
-              <Input id="amount" type="number" placeholder="0.00" autoFocus />
+              <Label>Tutar</Label>
+              <Input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required autoFocus />
             </div>
+
+            {/* Ödeme Yöntemi (Sadece Giderse Göster) */}
+            {type === 'EXPENSE' && (
+              <div className="grid gap-2">
+                <Label>Ödeme Yöntemi</Label>
+                <Select onValueChange={setPaymentMethod} defaultValue="CASH">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CASH">Nakit / Banka Hesabı</SelectItem>
+                    <SelectItem value="CREDIT_CARD">Kredi Kartı</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Kredi Kartı Seçimi (Eğer Yöntem KK ise) */}
+            {type === 'EXPENSE' && paymentMethod === 'CREDIT_CARD' && (
+              <div className="grid gap-2">
+                <Label className="text-red-600">Hangi Kart?</Label>
+                <Select onValueChange={setSelectedCardId} required>
+                  <SelectTrigger><SelectValue placeholder="Kart Seçiniz" /></SelectTrigger>
+                  <SelectContent>
+                    {creditCards.length === 0 ? (
+                        <SelectItem value="none" disabled>Kayıtlı Kredi Kartı Yok</SelectItem>
+                    ) : (
+                        creditCards.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.bank_name || c.title}</SelectItem>
+                        ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Kategori */}
             <div className="grid gap-2">
               <Label>Kategori</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Kategori Seç" />
-                </SelectTrigger>
+              <Select onValueChange={setCategory}>
+                <SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger>
                 <SelectContent>
-                  {type === "expense" ? (
+                  {type === 'EXPENSE' ? (
                     <>
-                      <SelectItem value="market">Market & Gıda</SelectItem>
-                      <SelectItem value="rent">Kira / Fatura</SelectItem>
-                      <SelectItem value="transport">Ulaşım / Benzin</SelectItem>
-                      <SelectItem value="fun">Eğlence</SelectItem>
+                      <SelectItem value="Market">Market & Gıda</SelectItem>
+                      <SelectItem value="Fatura">Fatura / Kira</SelectItem>
+                      <SelectItem value="Ulasim">Ulaşım / Benzin</SelectItem>
+                      <SelectItem value="Eglence">Eğlence / Restoran</SelectItem>
+                      <SelectItem value="Giyim">Giyim</SelectItem>
+                      <SelectItem value="Saglik">Sağlık</SelectItem>
+                      <SelectItem value="Diger">Diğer</SelectItem>
                     </>
                   ) : (
                     <>
-                      <SelectItem value="salary">Maaş</SelectItem>
-                      <SelectItem value="freelance">Ek İş / Freelance</SelectItem>
-                      <SelectItem value="investment">Yatırım Getirisi</SelectItem>
+                      <SelectItem value="Maas">Maaş</SelectItem>
+                      <SelectItem value="Yatirim">Yatırım Getirisi</SelectItem>
+                      <SelectItem value="KiraGeliri">Kira Geliri</SelectItem>
+                      {/* İSTEK 2: Ek İş yerine Diğer */}
+                      <SelectItem value="Diger">Diğer</SelectItem> 
                     </>
                   )}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Açıklama */}
-            <div className="grid gap-2">
-              <Label htmlFor="desc">Açıklama (Opsiyonel)</Label>
-              <Input id="desc" placeholder="Örn: Migros alışverişi" />
-            </div>
+            {/* İSTEK 1: Açıklama (Sadece Giderse Göster) */}
+            {type === 'EXPENSE' && (
+              <div className="grid gap-2">
+                <Label>Açıklama</Label>
+                <Input placeholder="Örn: Migros alışverişi" value={desc} onChange={(e) => setDesc(e.target.value)} />
+              </div>
+            )}
 
             {/* Tarih */}
             <div className="grid gap-2">
-              <Label htmlFor="date">Tarih</Label>
-              <Input id="date" type="date" />
+              <Label>Tarih</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
 
-            <Button type="submit" className={type === "expense" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}>
-              {type === "expense" ? "Harcamayı Kaydet" : "Geliri Kaydet"}
+            <Button type="submit" className={type === "EXPENSE" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}>
+              {type === "EXPENSE" ? "Harcamayı Kaydet" : "Geliri Kaydet"}
             </Button>
           </form>
         </Tabs>

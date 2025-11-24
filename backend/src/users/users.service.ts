@@ -45,4 +45,13 @@ async create(data: Prisma.usersCreateInput) {
 
     return user;
   }
+
+  async updateSettings(userId: string, data: { reset_day: number }) {
+    return this.prisma.users.update({
+      where: { id: userId },
+      data: {
+        reset_day: data.reset_day
+      }
+    });
+  }
 }

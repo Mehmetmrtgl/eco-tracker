@@ -74,7 +74,7 @@ model debts {
   monthly_payment        Decimal?    @db.Decimal(15, 2) // Bu ay ödenecek taksit/asgari ödeme
   bank_name              String?     @db.VarChar(50) // Kredi Kartı/Kredi hangi bankadan?
   // -----------------------------
-
+  transactions     transactions[] 
   users                  users?      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
@@ -83,6 +83,7 @@ model transactions {
   user_id          String?     @db.Uuid
   account_id       String?     @db.Uuid
   category_id      String?     @db.Uuid
+  debt_id          String?     @db.Uuid // <-- YENİ EKLENEN ALAN (Hangi karta borç yazılacak?)
   type             String      @db.VarChar(10)
   amount           Decimal     @db.Decimal(15, 2)
   description      String?
@@ -91,6 +92,7 @@ model transactions {
   accounts         accounts?   @relation(fields: [account_id], references: [id], onUpdate: NoAction)
   categories       categories? @relation(fields: [category_id], references: [id], onUpdate: NoAction)
   users            users?      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  debts            debts?      @relation(fields: [debt_id], references: [id], onDelete: SetNull, onUpdate: NoAction) // <-- YENİ İLİŞKİ
 }
 
 model users {
@@ -100,6 +102,7 @@ model users {
   full_name          String?              @db.VarChar(100)
   created_at         DateTime?            @default(now()) @db.Timestamptz(6)
   updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  reset_day          Int?                 @default(1) // 1 ile 31 arası bir sayı
   accounts           accounts[]
   asset_transactions asset_transactions[]
   assets             assets[]

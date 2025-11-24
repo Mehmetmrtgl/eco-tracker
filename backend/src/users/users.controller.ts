@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Prisma } from '@prisma/client';
 
@@ -44,5 +44,10 @@ export class UsersController {
     }
     
     return { status: 'success', user };
+  }
+
+  @Patch(':id/settings')
+  updateSettings(@Param('id') id: string, @Body() body: { reset_day: number }) {
+    return this.usersService.updateSettings(id, body);
   }
 }
