@@ -21,7 +21,8 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:4000/users/login", {
+      // Backend'e istek atıyoruz (Auth modülüne)
+      const res = await fetch("http://localhost:4000/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -32,18 +33,27 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      if (data.status === "success") {
+      if (res.ok) {
+        // 1. TOKEN'I KAYDET (Pasaport)
+        localStorage.setItem("token", data.access_token);
+        
+        // 2. KULLANICI BİLGİSİNİ KAYDET (Hoş geldin demek için)
+        localStorage.setItem("currentUser", JSON.stringify(data.user));
+        
+        // Yönlendir
         router.push("/");
       } else {
+        // Hata mesajını göster
         setError(data.message || "Giriş başarısız.");
       }
     } catch (err) {
+      console.error("Giriş Hatası:", err);
       setError("Sunucuya bağlanılamadı.");
     } finally {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <Card className="w-[350px] shadow-lg">
