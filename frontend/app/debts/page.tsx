@@ -1,116 +1,228 @@
-import AddDebtDialog from "@/components/forms/AddDebtDialog";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowDownRight, CreditCard, Landmark, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import AddDebtDialog from "@/components/forms/AddDebtDialog";
 import { formatCurrency } from "@/lib/formatters";
-import { CreditCard, Landmark, AlertCircle } from "lucide-react";
+import { Edit2 } from "lucide-react"; // Edit ikonu
+import UpdateDebtDialog from "@/components/forms/UpdateDebtDialog";
+import PaymentDebtDialog from "@/components/forms/PaymentDebtDialog";
 
-// Örnek Veriler
-const debts = [
-  { 
-    id: 1, 
-    title: "Konut Kredisi", 
-    type: "loan", 
-    total: 1500000, 
-    remaining: 850000, 
-    dueDate: "2028-05-15" 
-  },
-  { 
-    id: 2, 
-    title: "Bonus Kredi Kartı", 
-    type: "credit_card", 
-    total: 35000, 
-    remaining: 12500, 
-    dueDate: "2023-11-28" 
-  },
-  { 
-    id: 3, 
-    title: "KYK Borcu", 
-    type: "loan", 
-    total: 45000, 
-    remaining: 42000, // Yeni başlamış, çoğu duruyor
-    dueDate: "2026-01-01" 
-  },
-];
+// Geçici Tip Tanımı (Normalde types/index.ts'ten gelmeli)
+interface Debt {
+  id: string;
+  title: string;
+  type: string;
+  total_amount: string | number;
+  remaining_amount: string | number;
+  due_date: string;
+  is_closed: boolean;
+    monthly_payment: string | number; 
+  bank_name?: string;               
+  recipient_name?: string;        
+}
 
 export default function DebtsPage() {
-  // Toplam Kalan Borç Hesaplama
-  const totalDebt = debts.reduce((acc, curr) => acc + curr.remaining, 0);
+  const router = useRouter();
+  const [debts, setDebts] = useState<Debt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+  const [isUpdateOpen, setIsUpdateOpen] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentDebt, setPaymentDebt] = useState<Debt | null>(null);
+
+  const fetchDebts = async () => {
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+      const token = localStorage.getItem("token");
+
+      if (!storedUser || !token) {
+        router.push("/login");
+        return;
+      }
+      
+      const user = JSON.parse(storedUser);
+      setCurrentUserId(user.id);
+      
+      // Borçları getiren endpoint'e istek at
+      const res = await fetch(`http://localhost:4000/debts/${user.id}`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        setDebts(data);
+      }
+    } catch (error) {
+      console.error("Borçlar getirilemedi:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Ödeme yap butonuna basıldığında (Şimdilik mock, ileride modal açılacak)
+  const handlePayment = (debt: Debt) => {
+      setPaymentDebt(debt);
+      setIsPaymentOpen(true);
+  };
+
+  const handleEdit = (debt: Debt) => {
+    setSelectedDebt(debt);
+    setIsUpdateOpen(true);
+  };
+
+  // Sayfa yüklendiğinde ve Borç eklendiğinde listeyi yenile
+  useEffect(() => {
+    fetchDebts();
+  }, [router]);
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
+  }
+
+  // Toplam Kalan Borç Hesaplama (UI Karşılaştırması için)
+  const totalRemainingDebt = debts.reduce((sum, debt) => sum + Number(debt.remaining_amount), 0);
 
   return (
     <div className="space-y-6">
-      {/* Başlık Alanı */}
+      
+      {/* BAŞLIK VE EKLE BUTONU */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-800">Borçlarım</h2>
-          <p className="text-slate-500">Kredi ve borç ödeme planlarını takip et.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-800">Borç Takibi</h2>
+          <p className="text-slate-500">Ödenmemiş tüm yükümlülüklerin.</p>
         </div>
-        <AddDebtDialog />
+        {/* AddDebtDialog onSuccess prop'u ile fetchDebts çağrılır */}
+        <AddDebtDialog onSuccess={fetchDebts} /> 
       </div>
 
-      {/* Özet Kartı */}
+      {/* ÖZET KARTI */}
       <Card className="bg-red-50 border-red-100">
-        <CardContent className="flex items-center gap-4 p-6">
-          <div className="p-3 bg-red-100 rounded-full text-red-600">
-            <AlertCircle size={32} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-red-600">Toplam Kalan Borç</p>
-            <h3 className="text-3xl font-bold text-slate-900">{formatCurrency(totalDebt)}</h3>
+        <CardContent className="flex items-center justify-between p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-100 rounded-full text-red-600">
+              <ArrowDownRight size={32} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-red-600">Toplam Kalan Borç</p>
+              <h3 className="text-3xl font-bold text-slate-900">
+                  {formatCurrency(totalRemainingDebt)}
+              </h3>
+            </div>
           </div>
         </CardContent>
       </Card>
+      
+      {/* BORÇ LİSTESİ */}
+      {debts.length === 0 ? (
+        <div className="text-center py-10 text-slate-500 bg-white rounded-lg border border-dashed">
+          Mevcut aktif borcun bulunmamaktadır.
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {debts.map((debt) => {
+            const total = Number(debt.total_amount);
+            const remaining = Number(debt.remaining_amount);
+            const percentPaid = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
+            const isCreditCard = debt.type === 'CREDIT_CARD';
 
-      {/* Borç Kartları Listesi */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {debts.map((debt) => {
-          // Yüzde Hesaplama: (Toplam - Kalan) / Toplam * 100
-          const paidAmount = debt.total - debt.remaining;
-          const percentPaid = Math.round((paidAmount / debt.total) * 100);
-
-          return (
-            <Card key={debt.id} className="flex flex-col justify-between">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <div className="flex items-center gap-3">
-                  {debt.type === 'credit_card' 
-                    ? <CreditCard className="text-purple-600 bg-purple-100 p-1.5 w-8 h-8 rounded-full"/> 
-                    : <Landmark className="text-orange-600 bg-orange-100 p-1.5 w-8 h-8 rounded-full"/>
-                  }
-                  <CardTitle className="text-base font-bold text-slate-800">
-                    {debt.title}
-                  </CardTitle>
-                </div>
-                <span className="text-xs font-medium px-2 py-1 bg-slate-100 rounded text-slate-600">
-                  {debt.type === 'loan' ? 'Kredi' : 'Kart'}
-                </span>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                {/* Rakamlar */}
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-xs text-slate-400">Kalan</p>
-                    <p className="text-xl font-bold text-slate-900">{formatCurrency(debt.remaining)}</p>
+            return (
+              <Card key={debt.id} className="flex flex-col justify-between">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <div className="flex items-center gap-3">
+                    {isCreditCard 
+                      ? <CreditCard className="text-purple-600 bg-purple-100 p-1.5 w-8 h-8 rounded-full"/> 
+                      : <Landmark className="text-orange-600 bg-orange-100 p-1.5 w-8 h-8 rounded-full"/>
+                    }
+                    <CardTitle className="text-base font-bold text-slate-800">
+                      {/* Banka adı varsa onu göster, yoksa başlığı (title) göster */}
+                      {debt.bank_name || debt.title}
+                    </CardTitle>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-400">Toplam</p>
-                    <p className="text-sm font-medium text-slate-600">{formatCurrency(debt.total)}</p>
-                  </div>
-                </div>
+                  <Button variant="ghost" size="icon" onClick={() => handleEdit(debt)} className="h-8 w-8 text-slate-400 hover:text-blue-600">
+                    <Edit2 size={16} />
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-4">
+                  
+                  {/* 1. ANA RAKAMLAR: TOPLAM ve BU AY */}
+                  <div className="grid grid-cols-2 gap-4">
+                    
+                    {/* Sol: Toplam Kalan Borç */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500 font-medium">Toplam Kalan Borç</p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {formatCurrency(remaining)}
+                      </p>
+                    </div>
 
-                {/* İlerleme Çubuğu */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-green-600 font-medium">Ödenen: %{percentPaid}</span>
-                    <span className="text-slate-400">{debt.dueDate} vadeli</span>
+                    {/* Sağ: Bu Ayki Ödeme (Vurgulu) */}
+                    <div className="space-y-1 bg-red-50 p-2 rounded-lg border border-red-100 text-right">
+                      <p className="text-xs text-red-600 font-bold">
+                        {isCreditCard ? "Bu Ayki Ekstre" : "Bu Ayki Taksit"}
+                      </p>
+                      <p className="text-lg font-bold text-red-700">
+                        {formatCurrency(Number(debt.monthly_payment))}
+                      </p>
+                    </div>
                   </div>
-                  {/* Progress bar: Ne kadar dolarsa o kadar iyi (borç bitiyor) */}
-                  <Progress value={percentPaid} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+
+                  {/* 2. İLERLEME ÇUBUĞU */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Ana Borç Ödeme Durumu</span>
+                      <span>%{percentPaid} ödendi</span>
+                    </div>
+                    <Progress value={percentPaid} className="h-2 bg-slate-100" />
+                    
+                    {/* Vade Tarihi */}
+                    <p className="text-xs text-right text-slate-400 mt-1">
+                      Bitiş: {debt.due_date ? new Date(debt.due_date).toLocaleDateString('tr-TR') : 'Belirsiz'}
+                    </p>
+                  </div>
+                  
+                  {/* AKILLI ÖDEME BUTONU */}
+                  <div className="pt-2">
+                      <Button 
+                        onClick={() => handlePayment(debt)} 
+                        className={`w-full text-white ${
+                          Number(debt.monthly_payment) > 0 
+                            ? "bg-slate-900 hover:bg-slate-800" // Normal Ödeme Rengi
+                            : "bg-green-600 hover:bg-green-700" // Ekstra Ödeme Rengi (Yeşil)
+                        }`}
+                      >
+                          {Number(debt.monthly_payment) > 0 
+                            ? `Bu Ayki Ödemeyi Yap (${formatCurrency(Number(debt.monthly_payment))})`
+                            : "Ekstra Ödeme Yap"
+                          }
+                      </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          {selectedDebt && (
+            <UpdateDebtDialog 
+              open={isUpdateOpen} 
+              onOpenChange={setIsUpdateOpen} 
+              debt={selectedDebt} 
+              onSuccess={fetchDebts} 
+            />
+          )}
+          {/* ÖDEME PENCERESİ */}
+          {paymentDebt && (
+            <PaymentDebtDialog 
+              open={isPaymentOpen} 
+              onOpenChange={setIsPaymentOpen} 
+              debt={paymentDebt} 
+              onSuccess={fetchDebts} 
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

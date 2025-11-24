@@ -211,27 +211,55 @@ export class AssetsService {
     });
   }
 
+  // 4. NET VARLIK ÖZETİ VE GRAFİK VERİSİ
   async getNetWorthSummary(userId: string) {
-    // 1. Tüm Varlıkları (Assets + Cash) getir
+    // 1. Tüm Varlıkları (Canlı Fiyatlı) getir
     const allAssets = await this.findAll(userId); 
 
-    // 2. Borçları (Debts) getir
+    // 2. Borçları getir
     const totalDebts = await this.prisma.debts.aggregate({
         _sum: { remaining_amount: true },
         where: { user_id: userId, is_closed: false },
     });
 
-    // 3. Toplam Varlık Değerini Hesapla (total_value'ları topluyoruz)
-    const totalAssetsValue = allAssets.reduce((sum, asset) => sum + asset.total_value, 0);
+    // 3. Toplam Varlık Değeri
+    const totalAssetsValue = allAssets.reduce((sum, asset) => sum + Number(asset.total_value), 0);
 
-    // 4. Net Varlık Hesabı (Varlıklar - Borçlar)
+    // 4. GRAFİK İÇİN GRUPLAMA MANTIĞI (YENİ) ---
+    const groupedData: Record<string, number> = {};
+    
+    allAssets.forEach((asset) => {
+        // Tipleri Türkçeleştirerek grupla
+        let label = asset.type;
+        if (asset.type === 'GOLD') label = 'Altın';
+        else if (asset.type === 'CURRENCY') label = 'Döviz';
+        else if (asset.type === 'CASH') label = 'Nakit';
+        else if (asset.type === 'STOCK') label = 'Borsa';
+        else if (asset.type === 'CRYPTO') label = 'Kripto';
+        else label = 'Diğer';
+
+        if (!groupedData[label]) {
+            groupedData[label] = 0;
+        }
+        groupedData[label] += Number(asset.total_value);
+    });
+
+    // Frontend'in istediği formata çevir: [{ name: 'Altın', value: 5000 }]
+    const pieChartData = Object.keys(groupedData).map(key => ({
+        name: key,
+        value: groupedData[key]
+    })).filter(item => item.value > 0); // Değeri 0 olanları grafikte gösterme
+    // -------------------------------------------
+
+    // 5. Net Varlık Hesabı
     const totalDebtsValue = totalDebts._sum.remaining_amount?.toNumber() || 0;
     const netWorth = totalAssetsValue - totalDebtsValue;
 
     return {
-        totalAssetsValue, // Toplam Varlık (Brüt)
-        totalDebtsValue,  // Toplam Borç
-        netWorth,         // Net Durum
+        totalAssetsValue,
+        totalDebtsValue,
+        netWorth,
+        pieChartData, // <-- Grafiğe gidecek veri
     };
   }
 }

@@ -12,6 +12,7 @@ interface SummaryData {
   totalAssetsValue: number;
   totalDebtsValue: number;
   netWorth: number;
+  pieChartData: { name: string; value: number }[]; // <-- YENİ
 }
 
 export default function Dashboard() {
@@ -130,7 +131,7 @@ export default function Dashboard() {
             <CardTitle>Varlık Dağılımı (Mock)</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <AssetChart />
+            <AssetChart data={summary?.pieChartData || []} />
           </CardContent>
         </Card>
 

@@ -46,7 +46,7 @@ export class ExchangeRateService {
         this.exchangeRates['GBP'] = 1 / currencyResponse.conversion_rates['GBP'];
       }
       
-      const XAU_TRY_RATE = 175000; 
+      const XAU_TRY_RATE = 172566; 
 
       if(XAU_TRY_RATE > 0) {
           const liveGramPrice = XAU_TRY_RATE / this.GOLD_CONVERSION_FACTOR; 

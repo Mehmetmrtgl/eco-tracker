@@ -29,3 +29,26 @@ export const ASSET_TYPES = [
   // MANUEL GİRİŞ
   { value: "other", label: "Diğer (Manuel)", group: "Diğer" },
 ];
+
+
+// frontend/lib/constants.ts (MEVCUT DOSYAYA EKLENECEK)
+
+// ... ASSET_TYPES Listesinin Bittiği Yerden Sonra Ekle ...
+
+export const DEBT_TYPES = [
+    { value: 'CREDIT_CARD', label: 'Kredi Kartı Borcu', group: 'BANK' },
+    { value: 'LOAN_CONSUMER', label: 'İhtiyaç Kredisi', group: 'BANK' },
+    { value: 'LOAN_HOUSING', label: 'Konut Kredisi', group: 'BANK' },
+    { value: 'LOAN_KYK', label: 'KYK Kredisi', group: 'BANK' },
+    { value: 'PERSON', label: 'Şahıs Borcu', group: 'PERSON' },
+];
+
+export const BANK_OPTIONS = [
+    { value: 'Halkbank', label: 'Halkbank' },
+    { value: 'Akbank', label: 'Akbank' },
+    { value: 'YapiKredi', label: 'Yapı Kredi' },
+    { value: 'Ziraat', label: 'Ziraat' },
+    { value: 'IsBankasi', label: 'İş Bankası' },
+    { value: 'QNB', label: 'QNB Finansbank' },
+    { value: 'OTHER', label: 'Diğer' },
+];

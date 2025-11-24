@@ -59,16 +59,23 @@ model categories {
 }
 
 model debts {
-  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  user_id          String?   @db.Uuid
-  title            String    @db.VarChar(100)
-  total_amount     Decimal   @db.Decimal(15, 2)
-  remaining_amount Decimal   @db.Decimal(15, 2)
-  due_date         DateTime? @db.Date
-  type             String?   @default("LOAN") @db.VarChar(20)
-  is_closed        Boolean?  @default(false)
-  created_at       DateTime? @default(now()) @db.Timestamptz(6)
-  users            users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                     String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id                String?     @db.Uuid
+  title                  String      @db.VarChar(100)
+  type                   String?     @db.VarChar(20) // LOAN, CREDIT_CARD, PERSON
+  total_amount           Decimal     @db.Decimal(15, 2)
+  remaining_amount       Decimal     @db.Decimal(15, 2)
+  due_date               DateTime?   @db.Date
+  is_closed              Boolean?    @default(false)
+  created_at             DateTime?   @default(now()) @db.Timestamptz(6)
+  
+  // --- YENİ EKLENEN ALANLAR ---
+  recipient_name         String?     @db.VarChar(100) // Kime borçlandık? (P2P için)
+  monthly_payment        Decimal?    @db.Decimal(15, 2) // Bu ay ödenecek taksit/asgari ödeme
+  bank_name              String?     @db.VarChar(50) // Kredi Kartı/Kredi hangi bankadan?
+  // -----------------------------
+
+  users                  users?      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model transactions {
