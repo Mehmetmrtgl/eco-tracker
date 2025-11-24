@@ -6,11 +6,13 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module'; 
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { AssetsModule } from './assets/assets.module';
+import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
 
 @Module({
   imports: [
     PrismaModule, 
-    UsersModule, AuthModule,
+    UsersModule, AuthModule, AssetsModule, ExchangeRateModule,
   ],
   controllers: [AppController],
   providers: [AppService], 

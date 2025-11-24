@@ -1,11 +1,19 @@
+// frontend/types/index.ts - DÜZELTİLMİŞ VERSİYON
 
-export type AssetType = "gold" | "currency" | "stock" | "crypto" | "cash";
+export type AssetType = "GOLD" | "CURRENCY" | "STOCK" | "CRYPTO" | "CASH";
 
 export interface Asset {
   id: string;
-  name: string;      // Örn: Çeyrek Altın
-  type: AssetType;   // Örn: gold
-  amount: number;    // Örn: 5 (adet)
-  value: number;     // Örn: 22500 (TL karşılığı)
-  changeRate: number; // Örn: 1.5 (Yüzde değişim)
+  name: string;
+  type: string;       
+  symbol: string;    
+  
+  quantity: number | string; 
+  avg_cost: number | string;
+  
+  current_price: number | string; 
+  total_value: number | string;   
+  
+  updated_at?: string;
+  created_at?: string; // Diğer tarih alanları için ekleyelim
 }
