@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import AddAssetDialog from "@/components/forms/AddAssetDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatters";
-import { Coins, Banknote, Landmark, ArrowUpRight, Loader2 } from "lucide-react";
+import { Coins, Banknote, Landmark, ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Asset } from "@/types";
 import AssetDetailSheet from "@/components/dashboard/AssetDetailSheet"; 
@@ -92,67 +92,92 @@ export default function AssetsPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {assets.map((asset) => (
-            <Card 
-                key={asset.id} 
-                className="hover:shadow-md transition-shadow cursor-pointer" 
-                onClick={() => handleCardClick(asset)} 
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="flex items-center gap-3">
-                  {getIcon(asset.type)}
-                  <div>
-                    <CardTitle className="text-base font-bold text-slate-800">
-                      {asset.name}
-                    </CardTitle>
-                    {/* Nakit için adet gösterme */}
-                    {asset.type !== 'CASH' && (
-                        <p className="text-xs text-slate-500">{Number(asset.quantity)} Adet</p>
-                    )}
+          {assets.map((asset) => {
+            // Yardımcı değişken: Likit varlık mı? (Nakit veya Vadeli Mevduat)
+            const isLiquid = asset.type === 'CASH' || asset.symbol === 'deposit';
+
+            return (
+              <Card 
+                  key={asset.id} 
+                  className="hover:shadow-md transition-shadow cursor-pointer" 
+                  onClick={() => handleCardClick(asset)} 
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div className="flex items-center gap-3">
+                    {getIcon(asset.type)}
+                    <div>
+                      <CardTitle className="text-base font-bold text-slate-800">
+                        {asset.name}
+                      </CardTitle>
+                      {/* Likit değilse adet göster, likitse gösterme */}
+                      {!isLiquid && (
+                          <p className="text-xs text-slate-500">{Number(asset.quantity)} Adet</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
+                </CardHeader>
                 <CardContent>
                   <div className="mt-4 space-y-2">
-          
-                  {/* --- 1. Toplam Değer (Ana Rakam) --- */}
-                  <div className="flex justify-between items-center pb-2 border-b">
-                      <p className="text-sm font-semibold text-slate-500">
-                          {asset.type === 'CASH' ? 'Toplam Bakiye' : 'Güncel Toplam Değer'}
-                      </p>
-                      
-                      <div className="text-2xl font-bold text-slate-900">
-                          {/* DÜZELTME: total_value'yu Number() ile sar */}
-                          {formatCurrency(Number(asset.total_value))} 
-                      </div>
-                  </div>
-                    {/* --- 2. Maliyet & Birim Fiyat Detayı --- */}
-                    {asset.type !== 'CASH' && (
-                        <div className="flex justify-between text-sm pt-1">
-                            <div className="flex flex-col">
-                                <p className="text-xs text-slate-400">Ortalama Maliyet</p>
-                                <p className="font-medium">
-                                  {/* DÜZELTME: avg_cost'u Number() ile sar */}
-                                  {formatCurrency(Number(asset.avg_cost))}
-                                </p>
+                    
+                    {/* 1. Toplam Değer (Ana Rakam) */}
+                    <div className="flex justify-between items-center pb-2 border-b">
+                        <p className="text-sm font-semibold text-slate-500">
+                           {isLiquid ? 'Toplam Bakiye' : 'Güncel Toplam Değer'}
+                        </p>
+                        <div className="text-2xl font-bold text-slate-900">
+                        {/* Eğer Likit ise (Nakit/Vadeli) direkt Miktarı göster, yoksa Hesaplanan Değeri göster */}
+                          {formatCurrency(isLiquid ? Number(asset.quantity) : Number(asset.total_value))} 
+                        </div>
+                    </div>
+                    
+                    {/* 2. Detaylar (Sadece Likit OLMAYANLAR için) */}
+                    {!isLiquid && (
+                        <div className="flex justify-between text-sm pt-1 items-end">
+                            <div className="flex flex-col gap-1">
+                                <div>
+                                  <span className="text-xs text-slate-400 block">Ortalama Maliyet</span>
+                                  <span className="font-medium">
+                                    {formatCurrency(Number(asset.avg_cost))}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-slate-400 block">Anlık Fiyat</span>
+                                  <span className="font-medium text-slate-600">
+                                    {formatCurrency(Number(asset.current_price))}
+                                  </span>
+                                </div>
                             </div>
-                            <div className="flex flex-col items-end">
-                                <p className="text-xs text-slate-400">Anlık Birim Fiyat</p>
-                                <p className="font-medium text-green-600">
-                                  {/* DÜZELTME: current_price'ı Number() ile sar */}
-                                  {formatCurrency(Number(asset.current_price))}
-                                </p>
-                            </div>
+
+                            {/* Kâr / Zarar Göstergesi */}
+                            {(() => {
+                               const cost = Number(asset.avg_cost);
+                               const current = Number(asset.current_price);
+                               if (cost === 0) return null;
+
+                               const profitRate = ((current - cost) / cost) * 100;
+                               const isProfit = profitRate >= 0;
+                               
+                               return (
+                                 <div className={`flex items-center font-bold px-2 py-1 rounded-lg text-xs ${
+                                   isProfit ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                 }`}>
+                                   {isProfit ? <ArrowUpRight size={14} className="mr-1"/> : <ArrowDownRight size={14} className="mr-1"/>}
+                                   %{Math.abs(profitRate).toFixed(2)}
+                                 </div>
+                               );
+                            })()}
                         </div>
                     )}
                     
-                    {asset.type === 'CASH' && (
-                        <p className="text-sm text-slate-400 pt-1">Likit Varlık (Birim Maliyet: 1 TL)</p>
+                    {/* Likit Varlık Mesajı */}
+                    {isLiquid && (
+                      <p className="text-sm text-slate-400 pt-1">Likit Varlık (1 TL = 1 TL)</p>
                     )}
                   </div>
                 </CardContent>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 

@@ -1,27 +1,26 @@
-import { Controller, Get, Post, Body, Param, Patch} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { TransactionsService } from '../transactions/transactions.service'; // <-- YENİ
 import { Prisma } from '@prisma/client';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly transactionsService: TransactionsService // <-- ENJEKTE ET
+  ) {}
 
-@Post()
+  @Post()
   async create(@Body() createUserDto: Prisma.usersCreateInput) {
     try {
       const newUser = await this.usersService.create(createUserDto);
-      
       return { status: 'success', data: newUser };
-
     } catch (error) {
-      
-      console.error('Kayıt Hatası Detayı:', error);
-
+      console.error('Kayıt Hatası:', error);
       if (error.message === 'DUPLICATE_EMAIL') {
         return { status: 'error', message: 'Bu e-posta adresi zaten kullanımda.' };
       }
-
-      return { status: 'error', message: 'Kayıt olurken sunucu hatası oluştu.' };
+      return { status: 'error', message: 'Kayıt sırasında bir hata oluştu.' };
     }
   }
 
@@ -35,19 +34,30 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-  @Post('login')
-  async login(@Body() body: { email: string; password_hash: string }) {
-    const user = await this.usersService.login(body.email, body.password_hash);
-    
-    if (!user) {
-      return { status: 'error', message: 'Hatalı e-posta veya şifre!' };
-    }
-    
-    return { status: 'success', user };
+  @Patch(':id/settings')
+  updateSettings(@Param('id') id: string, @Body() body: any) {
+    return this.usersService.updateSettings(id, body);
   }
 
-  @Patch(':id/settings')
-  updateSettings(@Param('id') id: string, @Body() body: { reset_day: number }) {
-    return this.usersService.updateSettings(id, body);
+  // --- YENİ: MAAŞI MANUEL TETİKLEME ---
+  @Post(':id/trigger-salary')
+  async triggerSalary(@Param('id') id: string) {
+    // 1. Kullanıcıyı ve maaş bilgisini bul
+    const user = await this.usersService.findOne(id);
+    if (!user || !user.salary_amount || Number(user.salary_amount) <= 0) {
+        throw new NotFoundException("Kullanıcı veya maaş bilgisi bulunamadı.");
+    }
+
+    // 2. İşlemi Oluştur
+    await this.transactionsService.create(user.id, {
+        amount: Number(user.salary_amount),
+        type: 'INCOME',
+        category: 'Maas',
+        description: 'Manuel Maaş Girişi',
+        paymentMethod: 'CASH',
+        date: new Date().toISOString(),
+    });
+
+    return { status: 'success', message: 'Maaş hesaba eklendi.' };
   }
 }

@@ -6,7 +6,8 @@ import { Cron } from '@nestjs/schedule';
 @Injectable()
 export class ExchangeRateService {
   private exchangeRates: Record<string, number> = {
-    'cash_try': 1.00
+    'cash_try': 1.00,
+    'deposit': 1.00, 
   }; 
 
   private readonly GOLD_CONVERSION_FACTOR = 31.1035; 

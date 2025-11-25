@@ -81,7 +81,7 @@ export default function AddAssetDialog({ onSuccess }: { onSuccess?: () => void }
 
   // "Diğer" seçili mi kontrolü
   const isOtherSelected = formData.typeValue === "other";
-
+  const isLiquid = formData.typeValue === 'cash_try' || formData.typeValue === 'deposit';
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -139,24 +139,34 @@ export default function AddAssetDialog({ onSuccess }: { onSuccess?: () => void }
 
           {/* Miktar */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="amount" className="text-right">Miktar</Label>
+            <Label htmlFor="amount" className="text-right">
+                {isLiquid ? "Tutar" : "Adet/Miktar"}
+            </Label>
             <Input 
-              id="amount" type="number" placeholder="0" className="col-span-3"
+              id="amount" 
+              type="number" 
+              placeholder={isLiquid ? "Örn: 5000" : "Örn: 5"} 
+              className="col-span-3"
               value={formData.amount}
               onChange={(e) => setFormData({...formData, amount: e.target.value})}
               required
             />
           </div>
 
-          {/* Maliyet */}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="cost" className="text-right">Birim Fiyat</Label>
-            <Input 
-              id="cost" type="number" placeholder="TL" className="col-span-3"
-              value={formData.cost}
-              onChange={(e) => setFormData({...formData, cost: e.target.value})}
-            />
-          </div>
+          {/* Maliyet (Sadece Likit OLMAYANLAR için göster) */}
+          {!isLiquid && (
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="cost" className="text-right">Birim Fiyat</Label>
+                <Input 
+                id="cost" 
+                type="number" 
+                placeholder="Kaça aldın? (TL)" 
+                className="col-span-3"
+                value={formData.cost}
+                onChange={(e) => setFormData({...formData, cost: e.target.value})}
+                />
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="submit" disabled={loading}>{loading ? "..." : "Kaydet"}</Button>

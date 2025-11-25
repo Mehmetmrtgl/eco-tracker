@@ -46,12 +46,15 @@ async create(data: Prisma.usersCreateInput) {
     return user;
   }
 
-  async updateSettings(userId: string, data: { reset_day: number }) {
-    return this.prisma.users.update({
-      where: { id: userId },
-      data: {
-        reset_day: data.reset_day
-      }
-    });
-  }
+  async updateSettings(userId: string, data: { reset_day?: number, salary_day?: number, salary_amount?: number }) {
+      const updateData: any = {};
+      if (data.reset_day) updateData.reset_day = data.reset_day;
+      if (data.salary_day) updateData.salary_day = data.salary_day;
+      if (data.salary_amount) updateData.salary_amount = new Prisma.Decimal(data.salary_amount);
+
+      return this.prisma.users.update({
+        where: { id: userId },
+        data: updateData
+      });
+    }
 }

@@ -43,7 +43,7 @@ export class AssetsService {
     
     // Nakit (CASH) eklerken 'cost' belirtilmemişse 1 kabul et (Birim Maliyet Fix)
     let unitPrice = Number(createAssetDto.cost || 0);
-    if (createAssetDto.type === 'CASH' && unitPrice === 0) {
+if ((createAssetDto.type === 'CASH' || createAssetDto.symbol === 'deposit') && unitPrice === 0) {
         unitPrice = 1; 
     }
     
@@ -146,21 +146,31 @@ export class AssetsService {
   }
 
   // 2. Kullanıcının Varlıklarını Getirme
-  async findAll(userId: string) {
-    // 1. Varlıkları (Assets) getir: (quantity > 0 filtreli)
+async findAll(userId: string) {
+    // 1. Varlıkları (Assets) getir
     const physicalAssets = await this.prisma.assets.findMany({ 
         where: { user_id: userId, quantity: { gt: 0 } }, 
         orderBy: { updated_at: 'desc' },
     });
     
-    // 2. Nakit Cüzdanını (Account) getir:
+    // 2. Nakit Cüzdanını getir
     const cashAccount = await this.prisma.accounts.findFirst({
         where: { user_id: userId, name: 'Nakit Cüzdanı' },
     });
 
-    // 3. Varlıkların Toplam Değerini Hesapla
+    // 3. Varlıkların Toplam Değerini Hesapla (DÜZELTME BURADA)
     const assetsWithValues = physicalAssets.map((asset) => {
-      const currentPrice = this.exchangeRateService.getLivePrice(asset.symbol);
+      let currentPrice = this.exchangeRateService.getLivePrice(asset.symbol);
+      
+      // --- KRİTİK DÜZELTME: LİKİT VARLIK KORUMASI ---
+      // Eğer varlık 'CASH' tipindeyse veya sembolü 'deposit' (Vadeli) ise
+      // ve sistem fiyatı bulamadıysa (0 geldiyse), fiyatı otomatik 1 yap.
+      // Çünkü 1 TL Vadeli = 1 TL'dir.
+      if ((asset.type === 'CASH' || asset.symbol === 'deposit') && currentPrice === 0) {
+          currentPrice = 1;
+      }
+      // ----------------------------------------------
+
       const totalValue = asset.quantity.toNumber() * currentPrice;
 
       return {
@@ -176,7 +186,6 @@ export class AssetsService {
 
     // 4. Nakit Hesabını listeye ekle
     if (cashAccount) {
-        // Fix: cashAccount.balance'ın null olmaması gerektiğini garanti ediyoruz
         const isBalanceNotZero = cashAccount.balance!.toNumber() !== 0;
 
         if (isBalanceNotZero) {

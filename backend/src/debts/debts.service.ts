@@ -118,21 +118,21 @@ export class DebtsService {
     });
   }
 
-  async update(debtId: string, updateDto: { total_amount?: number, monthly_payment?: number }) {
-    const dataToUpdate: any = {};
-    
-    if (updateDto.total_amount !== undefined) {
-        dataToUpdate.total_amount = new Prisma.Decimal(updateDto.total_amount);
-        dataToUpdate.remaining_amount = new Prisma.Decimal(updateDto.total_amount);
-    }
+  async update(debtId: string, updateDto: any) {
+      const dataToUpdate: any = {};
+      
+      if (updateDto.total_amount !== undefined) dataToUpdate.total_amount = new Prisma.Decimal(updateDto.total_amount);
+      if (updateDto.remaining_amount !== undefined) dataToUpdate.remaining_amount = new Prisma.Decimal(updateDto.remaining_amount);
+      if (updateDto.monthly_payment !== undefined) dataToUpdate.monthly_payment = new Prisma.Decimal(updateDto.monthly_payment);
+      
+      // --- YENİ EKLENENLER ---
+      if (updateDto.cutoff_day !== undefined) dataToUpdate.cutoff_day = updateDto.cutoff_day;
+      if (updateDto.payment_due_day !== undefined) dataToUpdate.payment_due_day = updateDto.payment_due_day;
+      // -----------------------
 
-    if (updateDto.monthly_payment !== undefined) {
-        dataToUpdate.monthly_payment = new Prisma.Decimal(updateDto.monthly_payment);
+      return this.prisma.debts.update({
+        where: { id: debtId },
+        data: dataToUpdate,
+      });
     }
-
-    return this.prisma.debts.update({
-      where: { id: debtId },
-      data: dataToUpdate,
-    });
-  }
 }

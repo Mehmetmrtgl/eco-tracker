@@ -1,9 +1,9 @@
-"use client"; // Bu dosya tarayıcıda çalışacak (interaktif)
+"use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation"; // Hangi URL'deyiz?
+import { usePathname } from "next/navigation";
 import { MENU_ITEMS } from "@/lib/constants";
-import { cn } from "@/lib/utils"; // shadcn class birleştirme aracı
+import { cn } from "@/lib/utils";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -41,17 +41,7 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Alt Kısım: Kullanıcı Profili (Örnek) */}
-      <div className="p-4 border-t bg-slate-50">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-slate-300" /> {/* Avatar */}
-          <div className="text-sm">
-            <p className="font-medium">Kullanıcı Adı</p>
-            <p className="text-xs text-slate-500">Free Plan</p>
-          </div>
-        </div>
-      </div>
+      
     </aside>
   );
 }
