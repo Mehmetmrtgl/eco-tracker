@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox"; 
 import { Label } from "@/components/ui/label";
 import AddTransactionDialog from "@/components/forms/AddTransactionDialog";
-import EditTransactionDialog from "@/components/forms/EditTransactionDialog"; // <-- YENİ
+import EditTransactionDialog from "@/components/forms/EditTransactionDialog"; 
 import { formatCurrency } from "@/lib/formatters";
 
 export default function TransactionsPage() {
@@ -75,7 +75,6 @@ export default function TransactionsPage() {
     }
   };
 
-  // Düzenleme Butonuna Basılınca
   const handleEdit = (tx: any) => {
     setSelectedTx(tx);
     setIsEditOpen(true);
@@ -102,7 +101,6 @@ export default function TransactionsPage() {
   };
 
   const filteredTransactions = transactions.filter(t => {
-    // Kategori adı artık t.categories.name içinde
     const categoryName = t.categories?.name || "Diğer";
 
     const matchesSearch = 
@@ -197,27 +195,36 @@ export default function TransactionsPage() {
                       </div>
                     </TableCell>
                     
-                    {/* --- DÜZELTİLEN KATEGORİ ALANI --- */}
                     <TableCell>
                       <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 border border-slate-200">
                         {t.categories?.name || "Diğer"}
                       </span>
                     </TableCell>
-                    {/* ---------------------------------- */}
-
+                    
+                    {/* --- ÖDEME YÖNTEMİ (DÜZELTİLEN KISIM) --- */}
                     <TableCell className="text-xs text-slate-500">
-                      {t.debt_id ? (
+                      {t.credit_cards ? (
+                        // 1. Yeni Kredi Kartı Sistemi
                         <div className="flex items-center gap-1.5">
                             <CreditCard size={14} className="text-purple-500"/> 
-                            {t.debts?.bank_name || "Kredi Kartı"}
+                            {t.credit_cards.alias || t.credit_cards.bank_name}
+                        </div>
+                      ) : t.debts ? (
+                        // 2. Eski Borç Sistemi
+                        <div className="flex items-center gap-1.5">
+                            <CreditCard size={14} className="text-slate-500"/> 
+                            {t.debts.bank_name || "Borç"}
                         </div>
                       ) : (
+                        // 3. Nakit
                         <div className="flex items-center gap-1.5">
                             <Wallet size={14} className="text-blue-500"/> 
                             Nakit
                         </div>
                       )}
                     </TableCell>
+                    {/* ---------------------------------------- */}
+
                     <TableCell className="text-slate-500 text-sm">
                         {new Date(t.transaction_date).toLocaleDateString('tr-TR')}
                     </TableCell>
@@ -225,7 +232,6 @@ export default function TransactionsPage() {
                       {t.type === 'INCOME' ? '+' : '-'}{formatCurrency(Number(t.amount))}
                     </TableCell>
                     
-                    {/* --- DÜZENLE VE SİL BUTONLARI --- */}
                     <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                             <Button 
@@ -246,7 +252,6 @@ export default function TransactionsPage() {
                             </Button>
                         </div>
                     </TableCell>
-                    {/* ------------------------------- */}
                     
                   </TableRow>
                 ))
@@ -256,7 +261,6 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
 
-      {/* DÜZENLEME PENCERESİ */}
       <EditTransactionDialog 
         open={isEditOpen} 
         onOpenChange={setIsEditOpen} 

@@ -80,7 +80,11 @@ export class ExchangeRateService {
     }
     
     const price = this.exchangeRates[symbolUpper]; 
-    
+    // Public Getter: Frontend'in kurları okuması için
+
     return price || 0; 
+  }
+    public getRates(): Record<string, number> {
+    return this.exchangeRates;
   }
 }

@@ -1,14 +1,18 @@
 "use client";
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"; // <-- ReferenceLine eklendi
 import { formatCurrency } from "@/lib/formatters";
 
 interface DailyTrendChartProps {
   data: { date: string; amount: number }[];
+  avgDailyBudget: number; 
 }
 
-export default function DailyTrendChart({ data }: DailyTrendChartProps) {
+export default function DailyTrendChart({ data, avgDailyBudget }: DailyTrendChartProps) { // <-- PROP alındı
   
+  // Eğer bütçe limit çizgisi 0 ise göstermeyelim
+  const showBudgetLine = avgDailyBudget > 0;
+
   if (!data || data.length === 0) {
     return (
       <div className="h-[300px] w-full flex items-center justify-center text-slate-400 border-2 border-dashed rounded-lg">
@@ -17,7 +21,6 @@ export default function DailyTrendChart({ data }: DailyTrendChartProps) {
     );
   }
 
-  // Tarihi daha kısa göstermek için formatlayıcı (Örn: "24 Kas")
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
@@ -41,10 +44,11 @@ export default function DailyTrendChart({ data }: DailyTrendChartProps) {
             dataKey="date" 
             tickFormatter={formatDate}
             tick={{ fill: '#64748B' }}
-            minTickGap={30} // Tarihlerin üst üste binmemesi için
+            minTickGap={30}
           />
           <YAxis 
             tickFormatter={(val) => `₺${val/1000}k`} 
+            domain={[0, 'auto']} // Y ekseni 0'dan başlasın
             tick={{ fill: '#64748B' }}
             axisLine={false}
             tickLine={false}
@@ -54,6 +58,17 @@ export default function DailyTrendChart({ data }: DailyTrendChartProps) {
             labelFormatter={(label) => formatDate(label)}
             contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }}
           />
+
+          {/* KIRMIZI BÜTÇE ÇİZGİSİ */}
+          {showBudgetLine && (
+            <ReferenceLine 
+                y={avgDailyBudget} // <-- Hesaplanan günlük bütçe değeri
+                stroke="#FF0000" // Kırmızı
+                strokeDasharray="5 5" 
+                label={{ value: 'Günlük Limit', position: 'top', fill: '#FF0000', fontSize: 10 }}
+            />
+          )}
+
           <Area 
             type="monotone" 
             dataKey="amount" 

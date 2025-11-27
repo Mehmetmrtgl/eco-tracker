@@ -7,7 +7,7 @@ export interface Asset {
   name: string;
   type: string;       
   symbol: string;    
-  
+  owner?: string; 
   quantity: number | string; 
   avg_cost: number | string;
   

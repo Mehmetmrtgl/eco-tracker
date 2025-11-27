@@ -7,63 +7,60 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Save, CalendarClock, Wallet } from "lucide-react";
+import { Loader2, Save, Wallet, Plus, CreditCard, Trash2, Edit2, CalendarClock, Zap, Calendar, Landmark, Building2, Settings as SettingsIcon } from "lucide-react";
+import { BANK_OPTIONS } from "@/lib/constants";
+import { formatCurrency } from "@/lib/formatters";
+import EditCardDialog from "@/components/forms/EditCardDialog"; 
+import AddCardDialog from "@/components/forms/AddCardDialog";
+import AddAccountDialog from "@/components/forms/AddAccountDialog";
+
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState("");
   
-  // GENEL AYARLAR STATE
+  // STATE'LER
   const [resetDay, setResetDay] = useState("1");
-  
-  // MAAŞ AYARLARI STATE
   const [salaryDay, setSalaryDay] = useState("1");
   const [salaryAmount, setSalaryAmount] = useState("");
 
-  // KART AYARLARI STATE
   const [cards, setCards] = useState<any[]>([]);
-  const [selectedCardId, setSelectedCardId] = useState<string>("");
-  const [cardSettings, setCardSettings] = useState({
-    cutoffDay: "1",
-    dueDay: "10"
-  });
+  const [accounts, setAccounts] = useState<any[]>([]);
 
-  // Sayfa Yüklenince Verileri Çek
+  const [selectedCardToEdit, setSelectedCardToEdit] = useState<any>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAddCardOpen, setIsAddCardOpen] = useState(false);
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+
   useEffect(() => {
     const storedUser = localStorage.getItem("currentUser");
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setUserId(user.id);
       
-      // Mevcut ayarları doldur
       setResetDay(user.reset_day ? String(user.reset_day) : "1");
       setSalaryDay(user.salary_day ? String(user.salary_day) : "1");
       setSalaryAmount(user.salary_amount ? String(user.salary_amount) : "");
 
-      // Kullanıcının Kredi Kartlarını Çek
-      fetch(`http://localhost:4000/debts/${user.id}`)
-        .then(res => res.json())
-        .then(data => {
-          const creditCards = data.filter((d: any) => d.type === 'CREDIT_CARD' && !d.is_closed);
-          setCards(creditCards);
-        });
+      fetchCards(user.id);
+      fetchAccounts(user.id);
     }
   }, []);
 
-  // Kart seçilince ayarları doldur
-  useEffect(() => {
-    if (selectedCardId) {
-      const card = cards.find(c => c.id === selectedCardId);
-      if (card) {
-        setCardSettings({
-            cutoffDay: card.cutoff_day ? String(card.cutoff_day) : "1",
-            dueDay: card.payment_due_day ? String(card.payment_due_day) : "10"
-        });
-      }
-    }
-  }, [selectedCardId, cards]);
+  const fetchCards = async (uid: string) => {
+    try {
+      const res = await fetch(`http://localhost:4000/credit-cards/${uid}`);
+      if (res.ok) setCards(await res.json());
+    } catch (error) { console.error(error); }
+  };
 
-  // GENEL AYARLARI KAYDET (MAAŞ DAHİL)
+  const fetchAccounts = async (uid: string) => {
+    try {
+      const res = await fetch(`http://localhost:4000/accounts/${uid}`);
+      if (res.ok) setAccounts(await res.json());
+    } catch (error) { console.error(error); }
+  };
+
   const handleSaveGeneral = async () => {
     setLoading(true);
     try {
@@ -87,210 +84,238 @@ export default function SettingsPage() {
             userObj.salary_amount = updatedUser.salary_amount;
             localStorage.setItem("currentUser", JSON.stringify(userObj));
         }
-        alert("Ayarlar ve Maaş bilgisi kaydedildi!");
+        alert("Ayarlar kaydedildi.");
       }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error(error); } 
+    finally { setLoading(false); }
+  };
+
+  const handleDeleteCard = async (cardId: string) => {
+    if(!confirm("Bu kartı silmek istediğine emin misin?")) return;
+    try {
+        const res = await fetch(`http://localhost:4000/credit-cards/${cardId}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }) 
+        });
+        if (res.ok) fetchCards(userId);
+    } catch (error) { console.error(error); }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    if(!confirm("Hesabı silmek istediğine emin misin?")) return;
+    try {
+        const res = await fetch(`http://localhost:4000/accounts/${id}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }) 
+        });
+        if(res.ok) fetchAccounts(userId);
+    } catch (error) { console.error(error); }
   };
 
   const handleTriggerSalary = async () => {
-    if (!confirm("Bu ayki maaş tutarı Nakit Cüzdanı'na eklenecek. Onaylıyor musun?")) return;
-    
+    if (!confirm("Bu ayki maaş tutarı eklenecek. Onaylıyor musun?")) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:4000/users/${userId}/trigger-salary`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        alert("Maaş başarıyla eklendi!");
-      } else {
-        alert("Hata oluştu.");
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  // KART AYARLARINI KAYDET
-  const handleSaveCard = async () => {
-    if (!selectedCardId) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`http://localhost:4000/debts/${selectedCardId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-            cutoff_day: Number(cardSettings.cutoffDay),
-            payment_due_day: Number(cardSettings.dueDay)
-        }),
-      });
-
-      if (res.ok) {
-        alert("Kart ayarları güncellendi!");
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch(`http://localhost:4000/users/${userId}/trigger-salary`, { method: "POST" });
+      if (res.ok) alert("Maaş eklendi!");
+    } catch (error) { console.error(error); } 
+    finally { setLoading(false); }
   };
 
+  const handleEditCard = (card: any) => {
+      setSelectedCardToEdit(card);
+      setIsEditOpen(true);
+  };
+  
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6 pb-10">
+      <div className="flex flex-col gap-1">
         <h2 className="text-3xl font-bold tracking-tight text-slate-800">Ayarlar</h2>
-        <p className="text-slate-500">Uygulama tercihlerinizi ve otomasyonu yönetin.</p>
+        <p className="text-slate-500">Sistemi kişiselleştirin ve finansal araçlarınızı yönetin.</p>
       </div>
 
-      <Tabs defaultValue="general" className="w-full max-w-3xl">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="general">Genel & Maaş</TabsTrigger>
-          <TabsTrigger value="cards">Kart Ayarlarım</TabsTrigger>
-        </TabsList>
-
-        {/* --- SEKME 1: GENEL & MAAŞ --- */}
-        <TabsContent value="general">
-          <Card>
-            <CardHeader>
-              <CardTitle>Otomatik Gelir</CardTitle>
-              <CardDescription>Maaş gününü ve tutarını girerek her ay otomatik eklenmesini sağlayın.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              
-              {/* MAAŞ BLOĞU */}
-<div className="space-y-3 border-b pb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* --- SOL KOLON: GENEL AYARLAR & OTOMASYON (5 Birim) --- */}
+        <div className="lg:col-span-5">
+            {/* TEK BİRLEŞİK KART - Sabit Yükseklik: 600px */}
+            <Card className="border-slate-200 shadow-sm h-[600px] flex flex-col">
+                <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
+                    <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
+                        <SettingsIcon size={20} className="text-slate-500"/> Genel ve Otomasyon
+                    </CardTitle>
+                    <CardDescription>Tercihlerinizi ve otomatik işlemleri buradan yönetin.</CardDescription>
+                </CardHeader>
                 
-                {/* --- DÜZELTME BURADA: Başlık ve Butonu tek bir satıra aldık --- */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-green-700 font-medium">
-                        <Wallet size={18} /> Maaş Ayarları
-                    </div>
+                <CardContent className="pt-6 space-y-8 flex-1 overflow-y-auto">
                     
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleTriggerSalary}
-                        className="text-xs h-8 border-green-200 text-green-700 hover:bg-green-50"
-                    >
-                        Bu Ayı Şimdi Ekle
+                    {/* BÖLÜM 1: MAAŞ OTOMASYONU */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                             <Label className="text-xs font-bold text-green-700 uppercase flex items-center gap-1"><Zap size={14}/> Maaş Otomasyonu</Label>
+                             <Button variant="ghost" size="sm" onClick={handleTriggerSalary} className="h-6 text-[10px] text-green-600 hover:bg-green-50 hover:text-green-700">Şimdi Tetikle</Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-slate-500">Yatış Günü</Label>
+                                <Select value={salaryDay} onValueChange={setSalaryDay}>
+                                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                <SelectContent className="max-h-[200px]">{days.map((d) => <SelectItem key={d} value={String(d)}>{d}. Gün</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-slate-500">Tutar (Net)</Label>
+                                <div className="relative">
+                                    <Wallet className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                                    <Input type="number" value={salaryAmount} onChange={(e) => setSalaryAmount(e.target.value)} placeholder="0" className="pl-9 h-9"/>
+                                </div>
+                            </div>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-tight">Belirlenen günde bu tutar otomatik olarak "Nakit Cüzdanı"na eklenir.</p>
+                    </div>
+
+                    {/* BÖLÜM 2: GENEL TERCİHLER */}
+                    <div className="space-y-4">
+                        <div className="pb-2 border-b border-slate-100">
+                            <Label className="text-xs font-bold text-blue-700 uppercase flex items-center gap-1"><Calendar size={14}/> Analiz Döngüsü</Label>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs text-slate-500">Sıfırlama Günü</Label>
+                            <Select value={resetDay} onValueChange={setResetDay}>
+                                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                <SelectContent className="max-h-[200px]">{days.map((d) => <SelectItem key={d} value={String(d)}>Her ayın {d}. günü</SelectItem>)}</SelectContent>
+                            </Select>
+                            <p className="text-[11px] text-slate-400 leading-tight">Analiz ve grafikler her ay bu güne göre hesaplanır.</p>
+                        </div>
+                    </div>
+
+                </CardContent>
+                
+                <div className="p-6 border-t bg-slate-50/50 mt-auto">
+                    <Button onClick={handleSaveGeneral} disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800">
+                        {loading ? <Loader2 className="animate-spin mr-2" size={16}/> : <Save className="mr-2" size={16}/>}
+                        Tüm Ayarları Kaydet
                     </Button>
                 </div>
-                {/* ------------------------------------------------------------- */}
+            </Card>
+        </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                        <Label>Maaş Günü</Label>
-                        <Select value={salaryDay} onValueChange={setSalaryDay}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent className="max-h-[200px]">
-                            {days.map((d) => <SelectItem key={d} value={String(d)}>{d}. Gün</SelectItem>)}
-                        </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Tutar (Net)</Label>
-                        <div className="relative">
-                            <Input 
-                                type="number" 
-                                value={salaryAmount} 
-                                onChange={(e) => setSalaryAmount(e.target.value)} 
-                                placeholder="0" 
-                                className="pl-8"
-                            />
-                            <span className="absolute left-3 top-2.5 text-slate-500 text-sm">₺</span>
-                        </div>
-                    </div>
-                </div>
-                
-              </div>
+        {/* --- SAĞ KOLON: CÜZDAN YÖNETİMİ (7 Birim) --- */}
+        <div className="lg:col-span-7">
+            <Tabs defaultValue="cards" className="w-full h-full flex flex-col">
+                <TabsList className="grid w-full grid-cols-2 mb-4 h-10">
+                    <TabsTrigger value="cards">Kredi Kartları</TabsTrigger>
+                    <TabsTrigger value="accounts">Vadesiz Hesaplar</TabsTrigger>
+                </TabsList>
 
-              {/* DÖNGÜ AYARI */}
-              <div className="grid gap-2">
-                <Label>Analiz Sıfırlama Günü</Label>
-                <Select value={resetDay} onValueChange={setResetDay}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {days.map((d) => <SelectItem key={d} value={String(d)}>Her ayın {d}. günü</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-slate-500">Grafikler ve özetler bu güne göre hesaplanır.</p>
-              </div>
+                {/* KARTLAR SEKME İÇERİĞİ - Sabit Yükseklik: 600px (Header+Tabs farkı düşünülerek ayarlandı) */}
+                <TabsContent value="cards" className="mt-0">
+                    <Card className="border-slate-200 shadow-sm flex flex-col h-[560px]"> 
+                        <CardHeader className="pb-4 border-b bg-white">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-lg"><CreditCard className="text-purple-600" size={20}/> Kart Yönetimi</CardTitle>
+                                <Button size="sm" onClick={() => setIsAddCardOpen(true)} className="h-8 bg-purple-600 hover:bg-purple-700 gap-1 text-xs"><Plus size={14}/> Yeni Ekle</Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0 flex-1 overflow-y-auto bg-slate-50/30 custom-scrollbar">
+                            <div className="p-5 space-y-3">
+                                {cards.length === 0 ? (
+                                    <div className="text-center py-20 text-slate-400 border-2 border-dashed rounded-lg bg-white">
+                                        <Landmark size={40} className="mx-auto mb-2 opacity-20"/>
+                                        <p className="text-sm">Henüz kart eklenmemiş.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                                        {cards.map((c) => (
+                                            <div key={c.id} className="relative group rounded-lg border border-slate-200 hover:border-purple-300 hover:shadow-md transition-all p-4 bg-white">
+                                                <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none"><Landmark size={60} /></div>
+                                                <div className="relative z-10">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 shadow-sm"><CreditCard size={16} /></div>
+                                                            <div>
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{c.bank_name}</p>
+                                                                <h3 className="font-bold text-slate-800 text-sm">{c.alias}</h3>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <Button variant="ghost" size="icon" onClick={() => handleEditCard(c)} className="h-6 w-6 text-slate-400 hover:text-blue-600"><Edit2 size={12}/></Button>
+                                                            <Button variant="ghost" size="icon" onClick={() => handleDeleteCard(c.id)} className="h-6 w-6 text-slate-400 hover:text-red-600"><Trash2 size={12}/></Button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex justify-between items-end border-t border-slate-100 pt-2 mt-2">
+                                                        <span className="text-sm font-bold text-slate-700">{formatCurrency(Number(c.total_limit))}</span>
+                                                        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                                                            <span>Kesim: <b>{c.cutoff_day}</b></span>
+                                                            <span>S.Öd: <b>{c.due_day}</b></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-              <Button onClick={handleSaveGeneral} disabled={loading} className="bg-blue-600 hover:bg-blue-700 mt-2 w-full">
-                {loading ? <Loader2 className="animate-spin mr-2" size={18}/> : <Save className="mr-2" size={18}/>}
-                Kaydet
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                {/* HESAPLAR SEKME İÇERİĞİ */}
+                {/* HESAPLAR SEKME İÇERİĞİ (Sadece Banka Hesapları) */}
+                <TabsContent value="accounts" className="mt-0">
+                    <Card className="border-slate-200 shadow-sm flex flex-col h-[560px]">
+                        <CardHeader className="pb-4 border-b bg-white">
+                             <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-lg"><Building2 className="text-blue-600" size={20}/> Vadesiz Hesaplar</CardTitle>
+                                <Button size="sm" onClick={() => setIsAddAccountOpen(true)} className="h-8 bg-blue-600 hover:bg-blue-700 gap-1 text-xs"><Plus size={14}/> Hesap Ekle</Button>
+                             </div>
+                        </CardHeader>
+                        <CardContent className="p-0 flex-1 overflow-y-auto bg-slate-50/30 custom-scrollbar">
+                            <div className="p-5 space-y-3">
+                                {/* Elden Nakit/Cüzdanım hariç diğer hesapları filtrele */}
+                                {accounts.filter(acc => acc.name !== 'Elden Nakit' && acc.name !== 'Cüzdanım').length === 0 ? (
+                                    <div className="text-center py-20 text-slate-400 border-2 border-dashed rounded-lg bg-white">
+                                        <Wallet size={40} className="mx-auto mb-2 opacity-20"/>
+                                        <p className="text-sm">Henüz bir banka hesabı eklenmemiş.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3 grid-cols-1">
+                                        {accounts
+                                            .filter(acc => acc.name !== 'Elden Nakit' && acc.name !== 'Cüzdanım')
+                                            .map((acc) => (
+                                            <div key={acc.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 shadow-sm"><Building2 size={20} /></div>
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-800">{acc.name}</h3>
+                                                        <p className="text-xs text-slate-500">Vadesiz TL Hesabı</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <span className="text-lg font-bold text-slate-900">{formatCurrency(Number(acc.balance))}</span>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteAccount(acc.id)} className="h-8 w-8 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50"><Trash2 size={16}/></Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-        {/* --- SEKME 2: KART AYARLARI --- */}
-        <TabsContent value="cards">
-          <Card>
-            <CardHeader>
-              <CardTitle>Kredi Kartı Yapılandırması</CardTitle>
-              <CardDescription>Her kartın kesim ve son ödeme tarihini belirleyin.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-2">
-                <Label>Düzenlenecek Kartı Seçin</Label>
-                <Select value={selectedCardId} onValueChange={setSelectedCardId}>
-                  <SelectTrigger><SelectValue placeholder="Kart Seçiniz" /></SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {cards.length === 0 ? (
-                        <SelectItem value="none" disabled>Kayıtlı Kredi Kartı Yok</SelectItem>
-                    ) : (
-                        cards.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                                {c.bank_name || c.title} (Limit: {c.total_amount}₺)
-                            </SelectItem>
-                        ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+            </Tabs>
+        </div>
+      </div>
 
-              {selectedCardId && (
-                  <div className="space-y-4 border-t pt-4 animate-in fade-in slide-in-from-top-2">
-                      <div className="flex items-center gap-2 text-blue-600 bg-blue-50 p-3 rounded-md">
-                        <CalendarClock size={20} />
-                        <span className="text-sm font-medium">Bu tarihler hatırlatıcılar için kullanılacaktır.</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                            <Label>Hesap Kesim Günü</Label>
-                            <Select value={cardSettings.cutoffDay} onValueChange={(val) => setCardSettings({...cardSettings, cutoffDay: val})}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent className="max-h-[200px]">
-                                {days.map((d) => <SelectItem key={d} value={String(d)}>{d}. Gün</SelectItem>)}
-                            </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Son Ödeme Günü</Label>
-                            <Select value={cardSettings.dueDay} onValueChange={(val) => setCardSettings({...cardSettings, dueDay: val})}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent className="max-h-[200px]">
-                                {days.map((d) => <SelectItem key={d} value={String(d)}>{d}. Gün</SelectItem>)}
-                            </SelectContent>
-                            </Select>
-                        </div>
-                      </div>
-                      <Button onClick={handleSaveCard} disabled={loading} className="bg-slate-900 hover:bg-slate-800 w-full">
-                        {loading ? "..." : "Kartı Güncelle"}
-                      </Button>
-                  </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* DIALOGLAR */}
+      <AddCardDialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen} userId={userId} onSuccess={() => fetchCards(userId)} />
+      <AddAccountDialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen} userId={userId} onSuccess={() => fetchAccounts(userId)} />
+      <EditCardDialog open={isEditOpen} onOpenChange={setIsEditOpen} card={selectedCardToEdit} onSuccess={() => fetchCards(userId)} />
     </div>
   );
 }

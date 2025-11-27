@@ -2,17 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownRight, CreditCard, Landmark, Loader2 } from "lucide-react";
+import { ArrowDownRight, CreditCard, Landmark, Loader2, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import AddDebtDialog from "@/components/forms/AddDebtDialog";
-import { formatCurrency } from "@/lib/formatters";
-import { Edit2 } from "lucide-react"; // Edit ikonu
 import UpdateDebtDialog from "@/components/forms/UpdateDebtDialog";
 import PaymentDebtDialog from "@/components/forms/PaymentDebtDialog";
+import { formatCurrency } from "@/lib/formatters";
 
-// Geçici Tip Tanımı (Normalde types/index.ts'ten gelmeli)
 interface Debt {
   id: string;
   title: string;
@@ -21,49 +19,54 @@ interface Debt {
   remaining_amount: string | number;
   due_date: string;
   is_closed: boolean;
-    monthly_payment: string | number; 
-  bank_name?: string;               
-  recipient_name?: string;        
+  monthly_payment: string | number;
+  bank_name?: string;
+  recipient_name?: string;
 }
 
 export default function DebtsPage() {
   const router = useRouter();
   const [debts, setDebts] = useState<Debt[]>([]);
+  // YENİ: Kart Listesi State'i
+  const [cards, setCards] = useState<any[]>([]);
+  
   const [loading, setLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [isDebtAddOpen, setIsDebtAddOpen] = useState(false); // Dialog State
+
+  // Update & Payment Dialog States
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentDebt, setPaymentDebt] = useState<Debt | null>(null);
 
-  const fetchDebts = async () => {
-    try {
-      const storedUser = localStorage.getItem("currentUser");
-      const token = localStorage.getItem("token");
-
-      if (!storedUser || !token) {
-        router.push("/login");
-        return;
-      }
-      
-      const user = JSON.parse(storedUser);
-      setCurrentUserId(user.id);
-      
-      // Borçları getiren endpoint'e istek at
-      const res = await fetch(`http://localhost:4000/debts/${user.id}`);
-      
-      if (res.ok) {
-        const data = await res.json();
-        setDebts(data);
-      }
-    } catch (error) {
-      console.error("Borçlar getirilemedi:", error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchDebts = async (userId: string) => {
+      const res = await fetch(`http://localhost:4000/debts/${userId}`);
+      if (res.ok) setDebts(await res.json());
   };
 
-  // Ödeme yap butonuna basıldığında (Şimdilik mock, ileride modal açılacak)
+  // YENİ: Kartları Çekme Fonksiyonu
+  const fetchCards = async (userId: string) => {
+      const res = await fetch(`http://localhost:4000/credit-cards/${userId}`);
+      if (res.ok) setCards(await res.json());
+  };
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("currentUser");
+    const token = localStorage.getItem("token");
+
+    if (!storedUser || !token) { router.push("/login"); return; }
+    
+    const user = JSON.parse(storedUser);
+    setCurrentUserId(user.id);
+
+    Promise.all([
+        fetchDebts(user.id),
+        fetchCards(user.id) // <-- Kartları da çek
+    ]).finally(() => setLoading(false));
+
+  }, [router]);
+
   const handlePayment = (debt: Debt) => {
       setPaymentDebt(debt);
       setIsPaymentOpen(true);
@@ -74,49 +77,43 @@ export default function DebtsPage() {
     setIsUpdateOpen(true);
   };
 
-  // Sayfa yüklendiğinde ve Borç eklendiğinde listeyi yenile
-  useEffect(() => {
-    fetchDebts();
-  }, [router]);
-
   if (loading) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
   }
 
-  // Toplam Kalan Borç Hesaplama (UI Karşılaştırması için)
   const totalRemainingDebt = debts.reduce((sum, debt) => sum + Number(debt.remaining_amount), 0);
 
   return (
     <div className="space-y-6">
       
-      {/* BAŞLIK VE EKLE BUTONU */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-800">Borç Takibi</h2>
           <p className="text-slate-500">Ödenmemiş tüm yükümlülüklerin.</p>
         </div>
-        {/* AddDebtDialog onSuccess prop'u ile fetchDebts çağrılır */}
-        <AddDebtDialog onSuccess={fetchDebts} /> 
+        {/* YENİ BUTON KULLANIMI */}
+        <AddDebtDialog 
+            open={isDebtAddOpen} 
+            onOpenChange={setIsDebtAddOpen}
+            userId={currentUserId}
+            cards={cards} // <-- Kart listesini gönderiyoruz
+            onSuccess={() => fetchDebts(currentUserId)} 
+        />
+        <Button onClick={() => setIsDebtAddOpen(true)} className="bg-red-600 hover:bg-red-700">Borç Ekle</Button>
       </div>
 
-      {/* ÖZET KARTI */}
       <Card className="bg-red-50 border-red-100">
         <CardContent className="flex items-center justify-between p-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-100 rounded-full text-red-600">
-              <ArrowDownRight size={32} />
-            </div>
+            <div className="p-3 bg-red-100 rounded-full text-red-600"><ArrowDownRight size={32} /></div>
             <div>
               <p className="text-sm font-medium text-red-600">Toplam Kalan Borç</p>
-              <h3 className="text-3xl font-bold text-slate-900">
-                  {formatCurrency(totalRemainingDebt)}
-              </h3>
+              <h3 className="text-3xl font-bold text-slate-900">{formatCurrency(totalRemainingDebt)}</h3>
             </div>
           </div>
         </CardContent>
       </Card>
       
-      {/* BORÇ LİSTESİ */}
       {debts.length === 0 ? (
         <div className="text-center py-10 text-slate-500 bg-white rounded-lg border border-dashed">
           Mevcut aktif borcun bulunmamaktadır.
@@ -138,7 +135,6 @@ export default function DebtsPage() {
                       : <Landmark className="text-orange-600 bg-orange-100 p-1.5 w-8 h-8 rounded-full"/>
                     }
                     <CardTitle className="text-base font-bold text-slate-800">
-                      {/* Banka adı varsa onu göster, yoksa başlığı (title) göster */}
                       {debt.bank_name || debt.title}
                     </CardTitle>
                   </div>
@@ -147,52 +143,32 @@ export default function DebtsPage() {
                   </Button>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
-                  
-                  {/* 1. ANA RAKAMLAR: TOPLAM ve BU AY */}
                   <div className="grid grid-cols-2 gap-4">
-                    
-                    {/* Sol: Toplam Kalan Borç */}
                     <div className="space-y-1">
                       <p className="text-xs text-slate-500 font-medium">Toplam Kalan Borç</p>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {formatCurrency(remaining)}
-                      </p>
+                      <p className="text-2xl font-bold text-slate-900">{formatCurrency(remaining)}</p>
                     </div>
-
-                    {/* Sağ: Bu Ayki Ödeme (Vurgulu) */}
                     <div className="space-y-1 bg-red-50 p-2 rounded-lg border border-red-100 text-right">
-                      <p className="text-xs text-red-600 font-bold">
-                        {isCreditCard ? "Bu Ayki Ekstre" : "Bu Ayki Taksit"}
-                      </p>
-                      <p className="text-lg font-bold text-red-700">
-                        {formatCurrency(Number(debt.monthly_payment))}
-                      </p>
+                      <p className="text-xs text-red-600 font-bold">{isCreditCard ? "Bu Ayki Ekstre" : "Bu Ayki Taksit"}</p>
+                      <p className="text-lg font-bold text-red-700">{formatCurrency(Number(debt.monthly_payment))}</p>
                     </div>
                   </div>
 
-                  {/* 2. İLERLEME ÇUBUĞU */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-slate-500">
                       <span>Ana Borç Ödeme Durumu</span>
                       <span>%{percentPaid} ödendi</span>
                     </div>
                     <Progress value={percentPaid} className="h-2 bg-slate-100" />
-                    
-                    {/* Vade Tarihi */}
                     <p className="text-xs text-right text-slate-400 mt-1">
                       Bitiş: {debt.due_date ? new Date(debt.due_date).toLocaleDateString('tr-TR') : 'Belirsiz'}
                     </p>
                   </div>
                   
-                  {/* AKILLI ÖDEME BUTONU */}
                   <div className="pt-2">
                       <Button 
                         onClick={() => handlePayment(debt)} 
-                        className={`w-full text-white ${
-                          Number(debt.monthly_payment) > 0 
-                            ? "bg-slate-900 hover:bg-slate-800" // Normal Ödeme Rengi
-                            : "bg-green-600 hover:bg-green-700" // Ekstra Ödeme Rengi (Yeşil)
-                        }`}
+                        className={`w-full text-white ${Number(debt.monthly_payment) > 0 ? "bg-slate-900 hover:bg-slate-800" : "bg-green-600 hover:bg-green-700"}`}
                       >
                           {Number(debt.monthly_payment) > 0 
                             ? `Bu Ayki Ödemeyi Yap (${formatCurrency(Number(debt.monthly_payment))})`
@@ -204,24 +180,15 @@ export default function DebtsPage() {
               </Card>
             );
           })}
-          {selectedDebt && (
-            <UpdateDebtDialog 
-              open={isUpdateOpen} 
-              onOpenChange={setIsUpdateOpen} 
-              debt={selectedDebt} 
-              onSuccess={fetchDebts} 
-            />
-          )}
-          {/* ÖDEME PENCERESİ */}
-          {paymentDebt && (
-            <PaymentDebtDialog 
-              open={isPaymentOpen} 
-              onOpenChange={setIsPaymentOpen} 
-              debt={paymentDebt} 
-              onSuccess={fetchDebts} 
-            />
-          )}
         </div>
+      )}
+
+      {selectedDebt && (
+        <UpdateDebtDialog open={isUpdateOpen} onOpenChange={setIsUpdateOpen} debt={selectedDebt} onSuccess={() => fetchDebts(currentUserId)} />
+      )}
+      
+      {paymentDebt && (
+        <PaymentDebtDialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen} debt={paymentDebt} onSuccess={() => fetchDebts(currentUserId)} />
       )}
     </div>
   );

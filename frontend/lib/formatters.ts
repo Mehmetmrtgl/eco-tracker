@@ -1,10 +1,14 @@
-// src/lib/formatters.ts
+// frontend/src/lib/formatters.ts
 
-export const formatCurrency = (amount: number) => {
+export const formatCurrency = (amount: number, decimals: number = 0) => {
+  if (typeof amount !== 'number' || isNaN(amount)) {
+    return '₺0';
+  }
+  
   return new Intl.NumberFormat("tr-TR", {
     style: "currency",
     currency: "TRY",
-    minimumFractionDigits: 0, // Kuruşları gizle (sade görünüm için)
-    maximumFractionDigits: 0,
+    minimumFractionDigits: decimals, // <-- BURASI YENİ
+    maximumFractionDigits: decimals,
   }).format(amount);
 };

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Wallet, CreditCard, PieChart, Settings, ArrowRightLeft } from "lucide-react";
+import { LayoutDashboard, Wallet, CreditCard, PieChart, Settings, ArrowRightLeft, Target } from "lucide-react";
 
 
 export const MENU_ITEMS = [
@@ -8,6 +8,7 @@ export const MENU_ITEMS = [
   { name: "Borçlar", path: "/debts", icon: CreditCard },
   { name: "Analiz", path: "/analysis", icon: PieChart },
   { name: "Ayarlar", path: "/settings", icon: Settings },
+  { name: "Bütçe", path: "/budgets", icon: Target }, 
 ];
 
 export const ASSET_TYPES = [
@@ -23,7 +24,8 @@ export const ASSET_TYPES = [
   { value: "gbp", label: "Sterlin", group: "Döviz" },
   
   // NAKİT & MEVDUAT
-  { value: "cash_try", label: "Nakit (TL)", group: "Nakit" },
+  { value: "cash_physical", label: "Nakit (Cep/Cüzdan)", group: "Nakit" }, 
+  { value: "cash_bank", label: "Vadesiz TL (Banka)", group: "Nakit" }, 
   { value: "deposit", label: "Vadeli Mevduat", group: "Yatırım" },
   
   // MANUEL GİRİŞ
@@ -56,7 +58,7 @@ export const BANK_OPTIONS = [
 export const EXPENSE_CATEGORIES = [
   { value: 'Market', label: 'Market Alışverişi' },
   { value: 'Gida', label: 'Gıda / Yemek' }, 
-  
+  { value: 'KrediKarti', label: 'Kredi Kartı / Borç' },
   { value: 'Fatura', label: 'Fatura & Kira' },
   { value: 'Benzin', label: 'Benzin / Yakıt' },
   { value: 'Ulasim', label: 'Toplu Taşıma / Taksi' },

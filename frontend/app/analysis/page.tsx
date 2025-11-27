@@ -84,10 +84,10 @@ export default function AnalysisPage() {
       setDateRange(ranges);
 
       if (cards.length === 0) {
-          const cardsRes = await fetch(`http://localhost:4000/debts/${user.id}`);
+          const cardsRes = await fetch(`http://localhost:4000/credit-cards/${user.id}`);
           if (cardsRes.ok) {
               const cardsData = await cardsRes.json();
-              setCards(cardsData.filter((d: any) => d.type === 'CREDIT_CARD'));
+              setCards(cardsData); 
           }
       }
 
@@ -249,7 +249,11 @@ export default function AnalysisPage() {
             <CardTitle>Günlük Harcama Trendi</CardTitle>
         </CardHeader>
         <CardContent>
-            <DailyTrendChart data={data?.dailyTrend || []} />
+            {/* DÜZELTME: avgDailyBudget prop'unu gönderiyoruz */}
+            <DailyTrendChart 
+                data={data?.dailyTrend || []} 
+                avgDailyBudget={data?.averageDailyBudget || 0}
+            />
         </CardContent>
       </Card>
 

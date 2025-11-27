@@ -1,164 +1,180 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle } from "lucide-react";
 import { useState } from "react";
-import { DEBT_TYPES, BANK_OPTIONS } from "@/lib/constants"; 
+import { Loader2, DollarSign, CreditCard, Banknote } from "lucide-react"; // Calendar ikonunu kaldırdık
 
-export default function AddDebtDialog({ onSuccess }: { onSuccess: () => void }) {
-  const [open, setOpen] = useState(false);
+// Kart tipinin tanımı
+interface CreditCard {
+  id: string;
+  alias: string;
+  bank_name: string;
+}
+
+interface AddDebtDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  userId: string;
+  cards?: CreditCard[];
+  onSuccess: () => void;
+}
+
+export default function AddDebtDialog({ open, onOpenChange, userId, cards, onSuccess }: AddDebtDialogProps) {
   const [loading, setLoading] = useState(false);
-
-  const [formData, setFormData] = useState({
-    title: '', // Şahıs borçları için kullanılır
-    type: 'CREDIT_CARD',
-    bankName: '', 
-    recipientName: '', 
-    totalAmount: '',
-    monthlyPayment: '', 
-    dueDate: '',
+  
+  const [formData, setFormData] = useState({ 
+    debtType: "credit_card",
+    name: "",
+    amount: "",
+    // dueDate state'i kaldırıldı
   });
+
+  const finalCards = cards || [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validasyon: Artık tarih kontrolü yok
+    if (!formData.debtType || !formData.name || !formData.amount) {
+        alert("Lütfen gerekli alanları doldurunuz.");
+        return;
+    }
     setLoading(true);
 
     try {
-      const storedUser = localStorage.getItem("currentUser");
-      if (!storedUser) return;
-      const user = JSON.parse(storedUser);
+        let finalTitle = formData.name;
+        let finalBankName = null;
 
-      const isP2P = formData.type === 'PERSON';
-      const isBankDebt = formData.type !== 'PERSON';
+        if (formData.debtType === "credit_card") {
+            const selectedCard = finalCards.find(c => c.id === formData.name);
+            if (selectedCard) {
+                finalTitle = selectedCard.alias; 
+                finalBankName = selectedCard.bank_name; 
+            }
+        }
 
-      // OTOMATİK BAŞLIK MANTIĞI
-      // Eğer Banka ise başlık = Banka Adı (Örn: Akbank)
-      // Eğer Şahıs ise başlık = Girilen Açıklama (Örn: Altın Borcu)
-      let finalTitle = formData.title;
-      if (isBankDebt) {
-          // Banka seçilmediyse varsayılan bir isim koyalım
-          finalTitle = formData.bankName || "Banka Borcu"; 
-      }
+        const payload = {
+            title: finalTitle,
+            type: formData.debtType.toUpperCase(),
+            total_amount: Number(formData.amount),
+            due_date: null, // Tarih sorulmadığı için null gönderiyoruz
+            bank_name: finalBankName,
+            card_id: formData.debtType === "credit_card" ? formData.name : null,
+        };
+        
+        const res = await fetch(`http://localhost:4000/debts/${userId}`, {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify(payload),
+        });
 
-      const payload = {
-        title: finalTitle, 
-        type: formData.type,
-        total_amount: Number(formData.totalAmount),
-        due_date: formData.dueDate || null,
-        monthly_payment: isBankDebt ? Number(formData.monthlyPayment) : 0,
-        bank_name: isBankDebt ? formData.bankName : null,
-        recipient_name: isP2P ? formData.recipientName : null,
-      };
+        if (res.ok) {
+            onSuccess();
+            onOpenChange(false);
+            // Formu sıfırla
+            setFormData({ debtType: "credit_card", name: "", amount: "" });
+        } else {
+            const errorData = await res.json();
+            alert(`Borç eklenirken bir hata oluştu: ${errorData.message || 'Bilinmeyen Hata'}`);
+        }
 
-      const res = await fetch(`http://localhost:4000/debts/${user.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        setOpen(false);
-        setFormData({ title: '', type: 'CREDIT_CARD', bankName: '', recipientName: '', totalAmount: '', monthlyPayment: '', dueDate: '' });
-        onSuccess();
-      } else {
-        const errorData = await res.json();
-        alert(`Hata: ${errorData.message}`);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { 
+        console.error(error); 
+        alert("Sunucuya bağlanılamadı.");
+    } 
+    finally { setLoading(false); }
   };
-  
-  const selectedGroup = DEBT_TYPES.find(d => d.value === formData.type)?.group;
-  const showBankSelect = selectedGroup === 'BANK';
-  const showRecipient = selectedGroup === 'PERSON';
-  const showMonthly = selectedGroup === 'BANK' || selectedGroup === 'CREDIT_CARD';
+
+  const handleTypeChange = (value: string) => {
+    setFormData(prev => ({ 
+        ...prev, 
+        debtType: value,
+        name: value === "credit_card" && finalCards.length > 0 ? finalCards[0].id : "" 
+    }));
+  };
+
+  const isCreditCardDebt = formData.debtType === "credit_card";
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white">
-          <PlusCircle size={18} />
-          Borç Ekle
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <DialogTitle>Yeni Borç / Kredi Ekle</DialogTitle>
-          <DialogDescription>Borç bilgilerini girin.</DialogDescription>
+          <DialogTitle>Yeni Borç Ekle</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           
           {/* 1. Borç Tipi */}
-          <div className="grid gap-2">
+          <div className="space-y-2">
             <Label>Borç Tipi</Label>
-            <Select onValueChange={(val) => setFormData({...formData, type: val})} defaultValue={formData.type}>
-              <SelectTrigger> <SelectValue placeholder="Seçiniz..." /> </SelectTrigger>
-              <SelectContent>
-                {DEBT_TYPES.map(d => (<SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>))}
-              </SelectContent>
+            <Select value={formData.debtType} onValueChange={handleTypeChange}>
+                <SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="credit_card">Kredi Kartı Borcu</SelectItem>
+                    <SelectItem value="loan">Kredi (Bankacılık)</SelectItem>
+                    <SelectItem value="other">Diğer (Şahıs, Faturalar vb.)</SelectItem>
+                </SelectContent>
             </Select>
           </div>
-          
-          {/* 2A. BANKA SEÇİMİ (Banka ise sadece bu çıkar) */}
-          {showBankSelect && (
-            <div className="grid gap-2">
-              <Label>Banka</Label>
-              <Select onValueChange={(val) => setFormData({...formData, bankName: val})}>
-                <SelectTrigger> <SelectValue placeholder="Banka Seçiniz" /> </SelectTrigger>
-                <SelectContent>
-                  {BANK_OPTIONS.map(b => (<SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
-          {/* 2B. ŞAHIS İSE: Kime? */}
-          {showRecipient && (
-            <div className="grid gap-2">
-              <Label htmlFor="recipientName">Borç Verilen/Alınan Kişi</Label>
-              <Input id="recipientName" placeholder="Örn: Ahmet Yılmaz" onChange={(e) => setFormData({...formData, recipientName: e.target.value})} required={showRecipient} />
-            </div>
-          )}
-
-          {/* 3. AÇIKLAMA (SADECE ŞAHIS İSE GÖSTER) */}
-          {showRecipient && (
-            <div className="grid gap-2">
-                <Label htmlFor="title">Açıklama</Label>
-                <Input id="title" placeholder="Örn: Altın borcu" onChange={(e) => setFormData({...formData, title: e.target.value})} required={showRecipient} />
-            </div>
-          )}
-
-          {/* 4. Toplam Borç */}
-          <div className="grid gap-2">
-            <Label htmlFor="totalAmount">Toplam Borç (Anapara)</Label>
-            <Input id="totalAmount" type="number" placeholder="200000" onChange={(e) => setFormData({...formData, totalAmount: e.target.value})} required />
+          {/* 2. İsim/Kart Seçimi */}
+          <div className="space-y-2">
+            <Label>{isCreditCardDebt ? "Kart Seçimi" : "Borç Adı"}</Label>
+            
+            {isCreditCardDebt ? (
+                <Select 
+                    value={formData.name} 
+                    onValueChange={(val) => setFormData({...formData, name: val})}
+                    disabled={finalCards.length === 0}
+                >
+                    <SelectTrigger>
+                        <CreditCard size={16} className="absolute left-3 text-slate-400" />
+                        <SelectValue placeholder={finalCards.length === 0 ? "Tanımlı kartınız yok" : "Kredi Kartı Seçiniz"} className="pl-9"/>
+                    </SelectTrigger>
+                    <SelectContent>
+                        {finalCards.map(card => (
+                            <SelectItem key={card.id} value={card.id}>
+                                {card.alias} ({card.bank_name})
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            ) : (
+                <div className="relative">
+                    <Banknote size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                    <Input 
+                        value={formData.name} 
+                        onChange={(e) => setFormData({...formData, name: e.target.value})} 
+                        placeholder="Örn: Ev Kredisi, Ahmet'ten Borç" 
+                        className="pl-9"
+                        required
+                    />
+                </div>
+            )}
           </div>
           
-          {/* 5. Aylık Taksit / Ekstre */}
-          {showMonthly && (
-            <div className="grid gap-2">
-              <Label htmlFor="monthlyPayment">{formData.type === 'CREDIT_CARD' ? "Bu Ayki Ekstre Borcu" : "Aylık Taksit Tutarı"}</Label>
-              <Input id="monthlyPayment" type="number" placeholder="5000" onChange={(e) => setFormData({...formData, monthlyPayment: e.target.value})} required />
+          {/* 3. Sadece Tutar (Vade Tarihi Kaldırıldı) */}
+          <div className="space-y-2">
+            <Label>Tutar</Label>
+            <div className="relative">
+                <DollarSign size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                <Input 
+                    type="number" 
+                    value={formData.amount} 
+                    onChange={(e) => setFormData({...formData, amount: e.target.value})} 
+                    placeholder="0"
+                    className="pl-9"
+                    required
+                />
             </div>
-          )}
-
-          {/* 6. Bitiş Tarihi */}
-          <div className="grid gap-2">
-            <Label htmlFor="dueDate">Bitiş Tarihi</Label>
-            <Input id="dueDate" type="date" onChange={(e) => setFormData({...formData, dueDate: e.target.value})} />
           </div>
 
-          <DialogFooter>
-            <Button type="submit" className="bg-red-600 hover:bg-red-700" disabled={loading}>
-              {loading ? "Kaydediliyor..." : "Borcu Kaydet"}
+          <DialogFooter className="pt-4">
+            <Button type="submit" disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800">
+                {loading ? <Loader2 className="animate-spin mr-2" size={16}/> : "Borcu Kaydet"}
             </Button>
           </DialogFooter>
         </form>
