@@ -84,15 +84,14 @@ export class TransactionsService {
 async findAll(userId: string) {
     return this.prisma.transactions.findMany({
       where: { user_id: userId },
-      // SIRALAMA MANTIĞI DEĞİŞTİ:
       orderBy: [
-        { transaction_date: 'desc' }, // 1. Öncelik: İşlem Tarihi (Bugün en üstte)
-        { created_at: 'desc' }        // 2. Öncelik: Eklenme Zamanı (Son eklenen en üstte)
+        { transaction_date: 'desc' }, 
+        { created_at: 'desc' }        
       ],
       include: { 
         debts: true,     
         accounts: true,  
-        categories: true 
+        categories: true
       }, 
     });
   }
@@ -100,6 +99,7 @@ async findAll(userId: string) {
   // ... (findAll fonksiyonundan sonra) ...
 
   // ANALİZ VERİSİ GETİRME
+ // ANALİZ VERİSİ GETİRME
   async getAnalysis(userId: string, startDate: Date, endDate: Date) {
     
     // 1. Gelir ve Gider Toplamları
@@ -117,7 +117,7 @@ async findAll(userId: string) {
 
     // 2. Kategori Bazlı Harcama Dağılımı (Sadece Giderler)
     const expensesByCategory = await this.prisma.transactions.groupBy({
-      by: ['category_id'], // ID'ye göre grupla
+      by: ['category_id'],
       where: {
         user_id: userId,
         type: 'EXPENSE',
@@ -129,22 +129,22 @@ async findAll(userId: string) {
       _sum: { amount: true },
     });
 
-    // Kategori isimlerini bulmak için ID'leri kullan
-    // (Prisma groupBy ile include'u aynı anda desteklemez, bu yüzden manuel eşleştiriyoruz)
     const categoryIds = expensesByCategory.map(e => e.category_id).filter(id => id !== null) as string[];
     
     const categories = await this.prisma.categories.findMany({
       where: { id: { in: categoryIds } }
     });
 
-    // Veriyi Frontend için hazırla: [{ name: 'Market', value: 500 }, ...]
+    // Veriyi hazırla ve SIRALA
     const chartData = expensesByCategory.map(item => {
       const cat = categories.find(c => c.id === item.category_id);
       return {
         name: cat ? cat.name : 'Diğer',
         value: item._sum.amount?.toNumber() || 0
       };
-    }).filter(item => item.value > 0);
+    })
+    .filter(item => item.value > 0)
+    .sort((a, b) => b.value - a.value); // <-- ZİNCİR BURADA DÜZELTİLDİ
 
     // Toplamları düzenle
     const totalIncome = totals.find(t => t.type === 'INCOME')?._sum.amount?.toNumber() || 0;
@@ -156,5 +156,79 @@ async findAll(userId: string) {
       netSavings: totalIncome - totalExpense,
       expenseChart: chartData
     };
+  }
+  // ... (create, findAll, getAnalysis fonksiyonlarından sonra ekle) ...
+
+  // İŞLEM SİLME (Rollback Mantığıyla)
+  async remove(id: string, userId: string) {
+    return this.prisma.$transaction(async (prisma) => {
+      // 1. Silinecek işlemi bul
+      const transaction = await prisma.transactions.findFirst({
+        where: { id: id, user_id: userId },
+      });
+
+      if (!transaction) throw new BadRequestException("İşlem bulunamadı.");
+
+      // 2. Bakiyeyi Geri Al (Ters İşlem)
+      if (transaction.account_id) { // Nakit işlemse
+        if (transaction.type === 'INCOME') {
+          // Gelir siliniyorsa, parayı cüzdandan geri çek
+          await prisma.accounts.update({
+            where: { id: transaction.account_id },
+            data: { balance: { decrement: transaction.amount } },
+          });
+        } else if (transaction.type === 'EXPENSE') {
+          // Gider siliniyorsa, parayı cüzdana iade et
+          await prisma.accounts.update({
+            where: { id: transaction.account_id },
+            data: { balance: { increment: transaction.amount } },
+          });
+        }
+      }
+      
+      // Not: Kredi Kartı (debt_id) işlemlerinde borç bakiyesini güncellemiyoruz,
+      // çünkü kullanıcı borçları manuel yönetiyor demiştik. Sadece kaydı siliyoruz.
+
+      // 3. İşlemi Sil
+      return prisma.transactions.delete({ where: { id } });
+    });
+  }
+
+  async update(id: string, userId: string, updateDto: any) {
+    const dataToUpdate: any = {
+      description: updateDto.description,
+      transaction_date: updateDto.date ? new Date(updateDto.date) : undefined,
+    };
+
+    if (updateDto.category) {
+      const currentTx = await this.prisma.transactions.findUnique({
+        where: { id: id },
+        select: { type: true } 
+      });
+
+      if (currentTx) {
+        let category = await this.prisma.categories.findFirst({
+          where: { user_id: userId, name: updateDto.category, type: currentTx.type }
+        });
+
+        if (!category) {
+          category = await this.prisma.categories.create({
+            data: {
+              user_id: userId,
+              name: updateDto.category,
+              type: currentTx.type,
+              icon: 'default',
+            }
+          });
+        }
+        
+        dataToUpdate.category_id = category.id;
+      }
+    }
+
+    return this.prisma.transactions.updateMany({
+      where: { id: id, user_id: userId },
+      data: dataToUpdate,
+    });
   }
 }

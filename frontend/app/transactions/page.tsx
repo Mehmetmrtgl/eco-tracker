@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowUpRight, Loader2, Search, CreditCard, Wallet, Calendar } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Loader2, Search, CreditCard, Wallet, Calendar, Trash2, Edit2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox"; 
 import { Label } from "@/components/ui/label";
 import AddTransactionDialog from "@/components/forms/AddTransactionDialog";
+import EditTransactionDialog from "@/components/forms/EditTransactionDialog"; // <-- YENİ
 import { formatCurrency } from "@/lib/formatters";
 
 export default function TransactionsPage() {
@@ -18,8 +20,12 @@ export default function TransactionsPage() {
   
   // Filtre State'leri
   const [searchTerm, setSearchTerm] = useState("");
-  const [showCurrentPeriodOnly, setShowCurrentPeriodOnly] = useState(true); // Varsayılan: Sadece bu ay
-  const [resetDay, setResetDay] = useState(1); // Kullanıcının hesap kesim günü
+  const [showCurrentPeriodOnly, setShowCurrentPeriodOnly] = useState(true);
+  const [resetDay, setResetDay] = useState(1);
+
+  // Düzenleme State'leri
+  const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const fetchTransactions = async () => {
     try {
@@ -32,8 +38,6 @@ export default function TransactionsPage() {
       }
       
       const user = JSON.parse(storedUser);
-      
-      // Kullanıcının hesap kesim gününü al (Yoksa 1 varsay)
       setResetDay(user.reset_day || 1);
 
       const res = await fetch(`http://localhost:4000/transactions/${user.id}`);
@@ -49,43 +53,67 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleDelete = async (transactionId: string) => {
+    if (!confirm("Bu işlemi silmek istediğine emin misin? (Nakit bakiyesi geri alınacaktır)")) return;
+
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+      if (!storedUser) return;
+      const user = JSON.parse(storedUser);
+
+      const res = await fetch(`http://localhost:4000/transactions/${transactionId}?userId=${user.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        fetchTransactions();
+      } else {
+        alert("Silinirken hata oluştu.");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Düzenleme Butonuna Basılınca
+  const handleEdit = (tx: any) => {
+    setSelectedTx(tx);
+    setIsEditOpen(true);
+  };
+
   useEffect(() => {
     fetchTransactions();
   }, [router]);
 
-  // --- TARİH HESAPLAMA MANTIĞI ---
   const getStartDate = () => {
     const today = new Date();
     const currentDay = today.getDate();
-    const currentMonth = today.getMonth(); // 0-11 arası
+    const currentMonth = today.getMonth(); 
     const currentYear = today.getFullYear();
 
-    // Varsayılan: Bu ayın 'resetDay'i
     let start = new Date(currentYear, currentMonth, resetDay);
 
-    // Eğer bugün, hesap kesim gününden ÖNCEYSE (örn: Bugün 10'u, Kesim 15'i)
-    // O zaman dönem GEÇEN AYIN 15'inde başlamıştır.
     if (currentDay < resetDay) {
       start = new Date(currentYear, currentMonth - 1, resetDay);
     }
     
-    start.setHours(0, 0, 0, 0); // Saati sıfırla
+    start.setHours(0, 0, 0, 0); 
     return start;
   };
 
-  // --- FİLTRELEME ---
   const filteredTransactions = transactions.filter(t => {
-    // 1. Arama Filtresi (Açıklama veya Kategoriye göre)
+    // Kategori adı artık t.categories.name içinde
+    const categoryName = t.categories?.name || "Diğer";
+
     const matchesSearch = 
       t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.category?.toLowerCase().includes(searchTerm.toLowerCase());
+      categoryName.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // 2. Tarih Filtresi
     let matchesDate = true;
     if (showCurrentPeriodOnly) {
         const txDate = new Date(t.transaction_date);
         const startDate = getStartDate();
-        matchesDate = txDate >= startDate; // Başlangıç tarihinden sonraki işlemler
+        matchesDate = txDate >= startDate; 
     }
 
     return matchesSearch && matchesDate;
@@ -99,7 +127,6 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Başlık */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-800">İşlemler</h2>
@@ -108,10 +135,7 @@ export default function TransactionsPage() {
         <AddTransactionDialog onSuccess={fetchTransactions} />
       </div>
 
-      {/* Filtreler Alanı */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-end md:items-center bg-slate-50 p-4 rounded-lg border border-slate-100">
-        
-        {/* Arama Kutusu */}
         <div className="relative w-full md:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
           <Input
@@ -123,7 +147,6 @@ export default function TransactionsPage() {
           />
         </div>
 
-        {/* Dönem Filtresi Checkbox */}
         <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-md border border-slate-200 shadow-sm">
             <Checkbox 
                 id="periodFilter" 
@@ -141,7 +164,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Tablo */}
       <Card>
         <CardHeader className="p-0" />
         <CardContent className="p-0">
@@ -153,12 +175,13 @@ export default function TransactionsPage() {
                 <TableHead>Ödeme Yöntemi</TableHead>
                 <TableHead>Tarih</TableHead>
                 <TableHead className="text-right">Tutar</TableHead>
+                <TableHead className="w-[100px] text-right">İşlemler</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredTransactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-16 text-slate-500">
+                  <TableCell colSpan={6} className="text-center py-16 text-slate-500">
                     {searchTerm ? "Aradığınız kriterde işlem bulunamadı." : "Bu dönemde henüz işlem yok."}
                   </TableCell>
                 </TableRow>
@@ -173,11 +196,15 @@ export default function TransactionsPage() {
                         <span className="text-slate-700">{t.description || "Açıklama yok"}</span>
                       </div>
                     </TableCell>
+                    
+                    {/* --- DÜZELTİLEN KATEGORİ ALANI --- */}
                     <TableCell>
                       <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 border border-slate-200">
-                        {t.category}
+                        {t.categories?.name || "Diğer"}
                       </span>
                     </TableCell>
+                    {/* ---------------------------------- */}
+
                     <TableCell className="text-xs text-slate-500">
                       {t.debt_id ? (
                         <div className="flex items-center gap-1.5">
@@ -197,6 +224,30 @@ export default function TransactionsPage() {
                     <TableCell className={`text-right font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-slate-900'}`}>
                       {t.type === 'INCOME' ? '+' : '-'}{formatCurrency(Number(t.amount))}
                     </TableCell>
+                    
+                    {/* --- DÜZENLE VE SİL BUTONLARI --- */}
+                    <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                onClick={() => handleEdit(t)}
+                            >
+                                <Edit2 size={16} />
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => handleDelete(t.id)}
+                            >
+                                <Trash2 size={16} />
+                            </Button>
+                        </div>
+                    </TableCell>
+                    {/* ------------------------------- */}
+                    
                   </TableRow>
                 ))
               )}
@@ -204,6 +255,15 @@ export default function TransactionsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* DÜZENLEME PENCERESİ */}
+      <EditTransactionDialog 
+        open={isEditOpen} 
+        onOpenChange={setIsEditOpen} 
+        transaction={selectedTx}
+        onSuccess={fetchTransactions}
+      />
+
     </div>
   );
 }

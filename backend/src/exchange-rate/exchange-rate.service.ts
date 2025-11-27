@@ -25,10 +25,10 @@ export class ExchangeRateService {
     const API_KEY = process.env.EXCHANGE_RATE_API_KEY; 
 
     if (!API_KEY) {
-      this.exchangeRates['USD'] = 30.0; 
-      this.exchangeRates['EUR'] = 32.0;
-      this.exchangeRates['GBP'] = 38.0;
-      this.exchangeRates['gold_gram'] = 2800; 
+      this.exchangeRates['USD'] = 42.0; 
+      this.exchangeRates['EUR'] = 49.0;
+      this.exchangeRates['GBP'] = 56.0;
+      this.exchangeRates['gold_gram'] = 5670; 
       return; 
     }
 
@@ -47,7 +47,7 @@ export class ExchangeRateService {
         this.exchangeRates['GBP'] = 1 / currencyResponse.conversion_rates['GBP'];
       }
       
-      const XAU_TRY_RATE = 172566; 
+      const XAU_TRY_RATE =  176439.30; 
 
       if(XAU_TRY_RATE > 0) {
           const liveGramPrice = XAU_TRY_RATE / this.GOLD_CONVERSION_FACTOR; 

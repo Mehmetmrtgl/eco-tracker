@@ -13,7 +13,6 @@ interface AssetChartProps {
   data: ChartData[];
 }
 
-// GENİŞLETİLMİŞ RENK PALETİ
 const COLORS: Record<string, string> = {
   // --- Varlık Tipleri ---
   'Altın': '#EAB308',   // Sarı
@@ -23,25 +22,26 @@ const COLORS: Record<string, string> = {
   'Kripto': '#F97316',  // Turuncu
   
   // --- Harcama Kategorileri ---
-  'Market': '#F59E0B',  // Amber (Turuncumsu)
-  'Fatura': '#EF4444',  // Kırmızı
-  'Ulasim': '#06B6D4',  // Cyan (Mavimsi)
-  'Eglence': '#8B5CF6', // Mor
-  'Giyim': '#EC4899',   // Pembe
-  'Saglik': '#10B981',  // Zümrüt Yeşili
-  'Egitim': '#6366F1',  // İndigo
-  'Diger': '#64748B',   // Gri (Diğer için gri uygundur)
-  'Benzin': '#EF4444',      // Kırmızı (Fatura ile aynı olabilir veya farklı ton)
-  'EvcilHayvan': '#A855F7', // Morumsu
-  'Teknoloji': '#3B82F6',   // Mavi
-  'Bakim': '#EC4899',       // Pembe
-  // --- Gelir Kategorileri (İleride lazım olursa) ---
-  'Maas': '#22C55E',    // Yeşil
-  'EkIs': '#84CC16',    // Açık Yeşil
-  'Yatirim': '#14B8A6', // Teal
+  'KrediKarti': '#1E293B', // (Slate 800 - Koyu Gri)
+  'Market': '#F59E0B',      // Turuncu
+  'Gida': '#EA580C',        // Koyu Turuncu
+  'Restoran': '#BE185D',    // Bordo
+  'Eglence': '#8B5CF6',     // Mor
+  'Fatura': '#EF4444',      // Kırmızı
+  'Benzin': '#DC2626',      // Koyu Kırmızı
+  'Ulasim': '#06B6D4',      // Cyan
+  'EvcilHayvan': '#A855F7', // Açık Mor
+  'Giyim': '#EC4899',       // Pembe
+  'Saglik': '#10B981',      // Yeşil
+  'Egitim': '#4F46E5',      // İndigo
+  'Teknoloji': '#2563EB',   // Mavi
+  'Bakim': '#DB2777',       // Fuşya
+  'Diger': '#64748B',       // Gri
+  
+  'Maas': '#22C55E',
+  'Yatirim': '#14B8A6',
 };
 
-// Bilinmeyen kategoriler için yedek renk listesi (Döngüsel kullanılır)
 const FALLBACK_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8'];
 
 export default function AssetChart({ data }: AssetChartProps) {
@@ -55,7 +55,7 @@ export default function AssetChart({ data }: AssetChartProps) {
   }
 
   return (
-    <div className="h-[300px] w-full">
+    <div className="h-[300px] w-full text-xs font-medium">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -66,9 +66,12 @@ export default function AssetChart({ data }: AssetChartProps) {
             outerRadius={80}
             paddingAngle={5}
             dataKey="value"
+            // --- YÜZDE GÖSTERİMİ (HATA DÜZELTİLDİ) ---
+            label={({ percent }) => `${((percent || 0) * 100).toFixed(1)}%`}
+            labelLine={true}
+            // ----------------------------------------
           >
             {data.map((entry, index) => {
-              // Tanımlı renk varsa onu kullan, yoksa yedek listeden sırayla seç
               const color = COLORS[entry.name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length];
               return <Cell key={`cell-${index}`} fill={color} />;
             })}

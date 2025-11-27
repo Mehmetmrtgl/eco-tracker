@@ -54,12 +54,17 @@ export const BANK_OPTIONS = [
 ];
 
 export const EXPENSE_CATEGORIES = [
-  { value: 'Market', label: 'Market & Gıda' },
+  { value: 'Market', label: 'Market Alışverişi' },
+  { value: 'Gida', label: 'Gıda / Yemek' }, 
+  
   { value: 'Fatura', label: 'Fatura & Kira' },
-  { value: 'Benzin', label: 'Benzin / Yakıt' }, 
+  { value: 'Benzin', label: 'Benzin / Yakıt' },
   { value: 'Ulasim', label: 'Toplu Taşıma / Taksi' },
-  { value: 'EvcilHayvan', label: 'Evcil Hayvan (Pet)' }, 
-  { value: 'Eglence', label: 'Eğlence / Restoran' },
+  { value: 'EvcilHayvan', label: 'Evcil Hayvan (Pet)' },
+  
+  { value: 'Eglence', label: 'Eğlence / Aktivite' },
+  { value: 'Restoran', label: 'Restoran / Kafe' }, 
+  
   { value: 'Giyim', label: 'Giyim & Aksesuar' },
   { value: 'Saglik', label: 'Sağlık & İlaç' },
   { value: 'Teknoloji', label: 'Teknoloji & Elektronik' },

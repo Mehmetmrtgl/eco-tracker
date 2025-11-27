@@ -119,12 +119,17 @@ export class DebtsService {
       // --- YENİ EKLENEN KISIM: İŞLEMLER TABLOSUNA KAYIT ---
       // Önce "Borç Ödemesi" diye bir kategori var mı bakalım, yoksa oluşturalım
       let category = await prisma.categories.findFirst({
-        where: { user_id: debt.user_id, name: 'Borç Ödemesi', type: 'EXPENSE' }
+        where: { user_id: debt.user_id, name: 'KrediKarti', type: 'EXPENSE' }
       });
 
       if (!category) {
         category = await prisma.categories.create({
-          data: { user_id: debt.user_id, name: 'Borç Ödemesi', type: 'EXPENSE', icon: 'default' }
+          data: { 
+              user_id: debt.user_id, 
+              name: 'KrediKarti', // Sabit isim
+              type: 'EXPENSE', 
+              icon: 'default' 
+          }
         });
       }
 
@@ -135,10 +140,10 @@ export class DebtsService {
           type: 'EXPENSE',
           amount: new Prisma.Decimal(payment),
           category_id: category.id,
-          description: `${debt.bank_name || debt.title} Ödemesi`,
+          description: `${debt.bank_name || debt.title} Ödemesi`, 
           transaction_date: new Date(),
-          account_id: cashAccount.id, // Nakitten çıktı
-          debt_id: debt.id,           // Bu borç için ödendi
+          account_id: cashAccount.id,
+          debt_id: debt.id,       
         }
       });
       // ----------------------------------------------------
