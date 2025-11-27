@@ -62,8 +62,8 @@ export default function AssetChart({ data }: AssetChartProps) {
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={60}
-            outerRadius={80}
+            innerRadius={80}
+            outerRadius={110}
             paddingAngle={5}
             dataKey="value"
             // --- YÜZDE GÖSTERİMİ (HATA DÜZELTİLDİ) ---

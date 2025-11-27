@@ -100,61 +100,122 @@ async findAll(userId: string) {
 
   // ANALİZ VERİSİ GETİRME
  // ANALİZ VERİSİ GETİRME
-  async getAnalysis(userId: string, startDate: Date, endDate: Date) {
+  // ANALİZ VERİSİ GETİRME (Günlük Trend Eklendi)
+// ANALİZ VERİSİ GETİRME
+// ANALİZ VERİSİ GETİRME (Filtreli)
+// ANALİZ VERİSİ GETİRME (Kıyaslamalı)
+  async getAnalysis(userId: string, startDate: Date, endDate: Date, source: string = 'ALL') {
     
-    // 1. Gelir ve Gider Toplamları
+    // --- 1. TARİH ARALIĞI VE KIYASLAMA MANTIĞI ---
+    // Seçilen aralığın süresini (ms cinsinden) bul
+    const duration = endDate.getTime() - startDate.getTime();
+    
+    // Bir önceki dönemin tarihlerini hesapla
+    const prevStartDate = new Date(startDate.getTime() - duration);
+    const prevEndDate = new Date(startDate.getTime()); // Bitiş, şimdiki başlangıçtır
+
+    const whereClause: any = { user_id: userId, transaction_date: { gte: startDate, lte: endDate } };
+    const prevWhereClause: any = { user_id: userId, transaction_date: { gte: prevStartDate, lte: prevEndDate } };
+
+    // Kaynak filtresi
+    if (source === 'CASH') {
+        whereClause.debt_id = null;
+        prevWhereClause.debt_id = null;
+    } else if (source !== 'ALL' && source.length > 10) {
+        whereClause.debt_id = source;
+        prevWhereClause.debt_id = source;
+    }
+
+    // --- 2. VERİLERİ ÇEK ---
+    
+    // A. Şimdiki Dönem Toplamları
     const totals = await this.prisma.transactions.groupBy({
-      by: ['type'],
-      where: {
-        user_id: userId,
-        transaction_date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      _sum: { amount: true },
+      by: ['type'], where: whereClause, _sum: { amount: true },
     });
 
-    // 2. Kategori Bazlı Harcama Dağılımı (Sadece Giderler)
+    // B. Geçmiş Dönem Toplamları (Kıyaslama İçin)
+    const prevTotals = await this.prisma.transactions.groupBy({
+      by: ['type'], where: prevWhereClause, _sum: { amount: true },
+    });
+
+    // Değerleri Ayıkla
+    const currentIncome = totals.find(t => t.type === 'INCOME')?._sum.amount?.toNumber() || 0;
+    const currentExpense = totals.find(t => t.type === 'EXPENSE')?._sum.amount?.toNumber() || 0;
+    
+    const prevIncome = prevTotals.find(t => t.type === 'INCOME')?._sum.amount?.toNumber() || 0;
+    const prevExpense = prevTotals.find(t => t.type === 'EXPENSE')?._sum.amount?.toNumber() || 0;
+
+    // Yüzdelik Değişim Hesapla
+    const calculateChange = (curr: number, prev: number) => {
+        if (prev === 0) return curr > 0 ? 100 : 0; // Önceki 0 ise ve şimdi varsa %100 artış say
+        return ((curr - prev) / prev) * 100;
+    };
+
+    const percentages = {
+        income: calculateChange(currentIncome, prevIncome),
+        expense: calculateChange(currentExpense, prevExpense),
+        savings: calculateChange((currentIncome - currentExpense), (prevIncome - prevExpense))
+    };
+
+    // --- 3. GRAFİK VERİLERİ (Sadece Şimdiki Dönem İçin) ---
+    // (Burası önceki kodla aynı, sadece whereClause kullanıyoruz)
+    
     const expensesByCategory = await this.prisma.transactions.groupBy({
       by: ['category_id'],
-      where: {
-        user_id: userId,
-        type: 'EXPENSE',
-        transaction_date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
+      where: { ...whereClause, type: 'EXPENSE' },
       _sum: { amount: true },
     });
 
     const categoryIds = expensesByCategory.map(e => e.category_id).filter(id => id !== null) as string[];
-    
-    const categories = await this.prisma.categories.findMany({
-      where: { id: { in: categoryIds } }
-    });
+    const categories = await this.prisma.categories.findMany({ where: { id: { in: categoryIds } } });
 
-    // Veriyi hazırla ve SIRALA
     const chartData = expensesByCategory.map(item => {
       const cat = categories.find(c => c.id === item.category_id);
-      return {
-        name: cat ? cat.name : 'Diğer',
-        value: item._sum.amount?.toNumber() || 0
-      };
-    })
-    .filter(item => item.value > 0)
-    .sort((a, b) => b.value - a.value); // <-- ZİNCİR BURADA DÜZELTİLDİ
+      return { name: cat ? cat.name : 'Diğer', value: item._sum.amount?.toNumber() || 0 };
+    }).filter(item => item.value > 0 && item.name !== 'KrediKarti').sort((a, b) => b.value - a.value);
 
-    // Toplamları düzenle
-    const totalIncome = totals.find(t => t.type === 'INCOME')?._sum.amount?.toNumber() || 0;
-    const totalExpense = totals.find(t => t.type === 'EXPENSE')?._sum.amount?.toNumber() || 0;
+    // Ödeme Yöntemi ve Trend
+    const allExpenses = await this.prisma.transactions.findMany({
+      where: { ...whereClause, type: 'EXPENSE' },
+      select: { transaction_date: true, amount: true, debt_id: true }
+    });
+
+    let cashTotal = 0;
+    let creditCardTotal = 0;
+    const dailyMap = new Map<string, number>();
+
+    allExpenses.forEach(tx => {
+        const amt = tx.amount.toNumber();
+        if (tx.debt_id) creditCardTotal += amt; else cashTotal += amt;
+        if (tx.transaction_date) {
+            const dayKey = tx.transaction_date.toISOString().split('T')[0];
+            dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + amt);
+        }
+    });
+
+    const paymentMethodChart = [
+        { name: 'Kredi Kartı', value: creditCardTotal },
+        { name: 'Nakit', value: cashTotal }
+    ].filter(i => i.value > 0);
+
+    const dailyTrend: { date: string; amount: number }[] = [];
+    const today = new Date();
+    const effectiveEndDate = endDate > today ? today : endDate;
+    let loopDate = new Date(startDate);
+    while (loopDate <= effectiveEndDate) {
+        const dayKey = loopDate.toISOString().split('T')[0];
+        dailyTrend.push({ date: dayKey, amount: dailyMap.get(dayKey) || 0 });
+        loopDate.setDate(loopDate.getDate() + 1);
+    }
 
     return {
-      totalIncome,
-      totalExpense,
-      netSavings: totalIncome - totalExpense,
-      expenseChart: chartData
+      totalIncome: currentIncome,
+      totalExpense: currentExpense,
+      netSavings: currentIncome - currentExpense,
+      percentages, // <-- YENİ: Yüzdelik değişimler
+      expenseChart: chartData,
+      paymentMethodChart,
+      dailyTrend,
     };
   }
   // ... (create, findAll, getAnalysis fonksiyonlarından sonra ekle) ...

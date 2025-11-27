@@ -40,7 +40,7 @@ export default function IncomeExpenseChart({ income, expense }: IncomeExpenseCha
           <YAxis 
             axisLine={false} 
             tickLine={false} 
-            tickFormatter={(value) => `₺${value / 1000}k`} // Binlik kısaltma (10k gibi)
+            tickFormatter={(value) => `₺${value / 1000}k`} 
             tick={{ fill: '#64748B' }}
           />
           <Tooltip 

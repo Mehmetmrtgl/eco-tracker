@@ -19,12 +19,14 @@ export class TransactionsController {
   getAnalysis(
     @Param('userId') userId: string,
     @Query('start') start: string,
-    @Query('end') end: string
+    @Query('end') end: string,
+    @Query('source') source: string // <-- YENİ
   ) {
     return this.transactionsService.getAnalysis(
         userId, 
         new Date(start), 
-        new Date(end)
+        new Date(end),
+        source 
     );
   }
 
@@ -42,4 +44,6 @@ export class TransactionsController {
   ) {
     return this.transactionsService.update(id, userId, updateDto);
   }
+
+  
 }
