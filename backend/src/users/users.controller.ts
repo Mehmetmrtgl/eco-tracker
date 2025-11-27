@@ -40,19 +40,19 @@ export class UsersController {
   }
 
   // --- YENİ: MAAŞI MANUEL TETİKLEME ---
-  @Post(':id/trigger-salary')
+@Post(':id/trigger-salary')
   async triggerSalary(@Param('id') id: string) {
-    // 1. Kullanıcıyı ve maaş bilgisini bul
     const user = await this.usersService.findOne(id);
     if (!user || !user.salary_amount || Number(user.salary_amount) <= 0) {
-        throw new NotFoundException("Kullanıcı veya maaş bilgisi bulunamadı.");
+        throw new NotFoundException("Maaş bilgisi bulunamadı.");
     }
 
-    // 2. İşlemi Oluştur
+    // TransactionsService üzerinden işlem oluşturuyoruz.
+    // Bu servis zaten hem Cüzdanı güncelliyor hem de Transactions tablosuna yazıyor.
     await this.transactionsService.create(user.id, {
         amount: Number(user.salary_amount),
         type: 'INCOME',
-        category: 'Maas',
+        category: 'Maas', // Kategori ismi önemli
         description: 'Manuel Maaş Girişi',
         paymentMethod: 'CASH',
         date: new Date().toISOString(),

@@ -52,3 +52,26 @@ export const BANK_OPTIONS = [
     { value: 'QNB', label: 'QNB Finansbank' },
     { value: 'OTHER', label: 'Diğer' },
 ];
+
+export const EXPENSE_CATEGORIES = [
+  { value: 'Market', label: 'Market & Gıda' },
+  { value: 'Fatura', label: 'Fatura & Kira' },
+  { value: 'Benzin', label: 'Benzin / Yakıt' }, 
+  { value: 'Ulasim', label: 'Toplu Taşıma / Taksi' },
+  { value: 'EvcilHayvan', label: 'Evcil Hayvan (Pet)' }, 
+  { value: 'Eglence', label: 'Eğlence / Restoran' },
+  { value: 'Giyim', label: 'Giyim & Aksesuar' },
+  { value: 'Saglik', label: 'Sağlık & İlaç' },
+  { value: 'Teknoloji', label: 'Teknoloji & Elektronik' },
+  { value: 'Egitim', label: 'Eğitim / Kurs' },
+  { value: 'Bakim', label: 'Kişisel Bakım' },
+  { value: 'Diger', label: 'Diğer' },
+];
+
+export const INCOME_CATEGORIES = [
+  { value: 'Maas', label: 'Maaş' },
+  { value: 'EkIs', label: 'Ek İş / Freelance' },
+  { value: 'Yatirim', label: 'Yatırım Getirisi' },
+  { value: 'KiraGeliri', label: 'Kira Geliri' },
+  { value: 'Diger', label: 'Diğer' },
+];

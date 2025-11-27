@@ -26,6 +26,7 @@ export default function AddTransactionDialog({ onSuccess }: { onSuccess?: () => 
   // Kullanıcının Kredi Kartlarını Tutacak State
   const [creditCards, setCreditCards] = useState<any[]>([]);
 
+  // Dialog açılınca veya ödeme yöntemi değişince kredi kartlarını çek
   useEffect(() => {
     if (open && paymentMethod === 'CREDIT_CARD') {
       const storedUser = localStorage.getItem("currentUser");
@@ -50,7 +51,7 @@ export default function AddTransactionDialog({ onSuccess }: { onSuccess?: () => 
       if (!storedUser) return;
       const user = JSON.parse(storedUser);
 
-      // Eğer Gelir ise ve açıklama girilmediyse, kategori adını açıklama yapalım (Boş kalmasın)
+      // MANTIK: Eğer Gelir ise ve açıklama yoksa, kategori adını açıklama yap
       let finalDesc = desc;
       if (type === 'INCOME' && !finalDesc) {
           finalDesc = category; 
@@ -74,7 +75,10 @@ export default function AddTransactionDialog({ onSuccess }: { onSuccess?: () => 
 
       if (res.ok) {
         setOpen(false);
-        setAmount(""); setDesc(""); setCategory("");
+        // Formu temizle
+        setAmount(""); 
+        setDesc(""); 
+        setCategory("");
         if (onSuccess) onSuccess();
       } else {
         alert("İşlem eklenirken hata oluştu.");
@@ -150,15 +154,18 @@ export default function AddTransactionDialog({ onSuccess }: { onSuccess?: () => 
               <Label>Kategori</Label>
               <Select onValueChange={setCategory}>
                 <SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   {type === 'EXPENSE' ? (
                     <>
                       <SelectItem value="Market">Market & Gıda</SelectItem>
                       <SelectItem value="Fatura">Fatura / Kira</SelectItem>
-                      <SelectItem value="Ulasim">Ulaşım / Benzin</SelectItem>
+                      <SelectItem value="Benzin">Benzin / Yakıt</SelectItem>
+                      <SelectItem value="Ulasim">Toplu Taşıma / Taksi</SelectItem>
+                      <SelectItem value="EvcilHayvan">Evcil Hayvan (Pet)</SelectItem>
                       <SelectItem value="Eglence">Eğlence / Restoran</SelectItem>
                       <SelectItem value="Giyim">Giyim</SelectItem>
                       <SelectItem value="Saglik">Sağlık</SelectItem>
+                      <SelectItem value="Teknoloji">Teknoloji</SelectItem>
                       <SelectItem value="Diger">Diğer</SelectItem>
                     </>
                   ) : (
@@ -166,7 +173,6 @@ export default function AddTransactionDialog({ onSuccess }: { onSuccess?: () => 
                       <SelectItem value="Maas">Maaş</SelectItem>
                       <SelectItem value="Yatirim">Yatırım Getirisi</SelectItem>
                       <SelectItem value="KiraGeliri">Kira Geliri</SelectItem>
-                      {/* İSTEK 2: Ek İş yerine Diğer */}
                       <SelectItem value="Diger">Diğer</SelectItem> 
                     </>
                   )}
@@ -174,7 +180,7 @@ export default function AddTransactionDialog({ onSuccess }: { onSuccess?: () => 
               </Select>
             </div>
 
-            {/* İSTEK 1: Açıklama (Sadece Giderse Göster) */}
+            {/* AÇIKLAMA (SADECE GİDERSE GÖSTER) */}
             {type === 'EXPENSE' && (
               <div className="grid gap-2">
                 <Label>Açıklama</Label>

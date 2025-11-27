@@ -31,7 +31,10 @@ const COLORS: Record<string, string> = {
   'Saglik': '#10B981',  // Zümrüt Yeşili
   'Egitim': '#6366F1',  // İndigo
   'Diger': '#64748B',   // Gri (Diğer için gri uygundur)
-  
+  'Benzin': '#EF4444',      // Kırmızı (Fatura ile aynı olabilir veya farklı ton)
+  'EvcilHayvan': '#A855F7', // Morumsu
+  'Teknoloji': '#3B82F6',   // Mavi
+  'Bakim': '#EC4899',       // Pembe
   // --- Gelir Kategorileri (İleride lazım olursa) ---
   'Maas': '#22C55E',    // Yeşil
   'EkIs': '#84CC16',    // Açık Yeşil

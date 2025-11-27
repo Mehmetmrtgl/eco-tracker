@@ -71,6 +71,9 @@ export class DebtsService {
   
   // Ödeme Kaydetme İşlemi (En önemli kısım)
   // Ödeme Kaydetme İşlemi (Nakit Cüzdan Entegrasyonlu)
+// backend/src/debts/debts.service.ts
+
+  // Ödeme Kaydetme İşlemi (GÜNCELLENDİ)
   async recordPayment(debtId: string, paymentAmount: number) {
     const payment = Number(paymentAmount);
 
@@ -95,24 +98,50 @@ export class DebtsService {
         data: { balance: { decrement: new Prisma.Decimal(payment) } },
       });
 
-      // 3. BORCU GÜNCELLE (YENİ MANTIK BURADA)
+      // 3. Borcu Güncelle
       const currentRemaining = Number(debt.remaining_amount);
       const newRemaining = currentRemaining - payment;
       const isClosed = newRemaining <= 0.5;
 
-      // Bu ayki ödemeden de düş (0'ın altına inmesin)
       const currentMonthly = Number(debt.monthly_payment || 0);
       let newMonthly = currentMonthly - payment;
-      if (newMonthly < 0) newMonthly = 0; // Eksiye düşerse 0 yap
+      if (newMonthly < 0) newMonthly = 0;
 
       const updatedDebt = await prisma.debts.update({
         where: { id: debtId },
         data: {
           remaining_amount: new Prisma.Decimal(newRemaining > 0 ? newRemaining : 0),
-          monthly_payment: new Prisma.Decimal(newMonthly), // <-- GÜNCELLENDİ
+          monthly_payment: new Prisma.Decimal(newMonthly),
           is_closed: isClosed,
         },
       });
+
+      // --- YENİ EKLENEN KISIM: İŞLEMLER TABLOSUNA KAYIT ---
+      // Önce "Borç Ödemesi" diye bir kategori var mı bakalım, yoksa oluşturalım
+      let category = await prisma.categories.findFirst({
+        where: { user_id: debt.user_id, name: 'Borç Ödemesi', type: 'EXPENSE' }
+      });
+
+      if (!category) {
+        category = await prisma.categories.create({
+          data: { user_id: debt.user_id, name: 'Borç Ödemesi', type: 'EXPENSE', icon: 'default' }
+        });
+      }
+
+      // İşlemi Kaydet
+      await prisma.transactions.create({
+        data: {
+          user_id: debt.user_id,
+          type: 'EXPENSE',
+          amount: new Prisma.Decimal(payment),
+          category_id: category.id,
+          description: `${debt.bank_name || debt.title} Ödemesi`,
+          transaction_date: new Date(),
+          account_id: cashAccount.id, // Nakitten çıktı
+          debt_id: debt.id,           // Bu borç için ödendi
+        }
+      });
+      // ----------------------------------------------------
 
       return updatedDebt;
     });
